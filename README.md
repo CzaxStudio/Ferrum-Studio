@@ -90,10 +90,13 @@ Run everything without touching the terminal:
 <img width="1366" height="726" alt="Capture9" src="https://github.com/user-attachments/assets/1413c41c-76e5-45d8-a9c9-0127103f724f" />
 
 
+
 <img width="1365" height="720" alt="Capture15" src="https://github.com/user-attachments/assets/46135d08-a4af-4904-b6c1-f11db105fef2" />
 
 
+
 <img width="1366" height="724" alt="Capture11" src="https://github.com/user-attachments/assets/112264ea-0709-4b7c-be13-9d55560a388c" />
+
 
 
 <img width="1366" height="724" alt="Capture10" src="https://github.com/user-attachments/assets/a0de3f52-5ecf-4518-baac-c67d1a048c65" />
