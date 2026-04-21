@@ -110,7 +110,7 @@ Run everything without touching the terminal:
 1. Install Zig (0.11+ recommended)
 2. Open Ferrum Studio
 3. Open a folder or create a new Zig project
-4. Click **Run** ▶
+4. Click **Run** 
 
 ---
 
@@ -164,7 +164,7 @@ If you have ideas, suggestions, or improvements — feel free to open an issue o
 
 ## Support
 
-If you like Ferrum Studio, consider giving it a star ⭐
+If you like Ferrum Studio, consider giving it a star 
 It helps the project grow and reach more developers.
 
 ---
@@ -181,4 +181,4 @@ It’s an attempt to make Zig:
 
 ---
 
-**Built for developers who want Zig to “just work.”**
+**Built for developers who want to use Zig as a power, not a pain**
