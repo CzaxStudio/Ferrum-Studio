@@ -409,10 +409,9 @@ function acUpdate(ta) {
   const word = v.slice(start, pos)
   AC.word = word; AC.wordStart = start
 
-  // Trigger on 2+ chars, or on 1 char if it's @ (builtins)
-  if (word.length < 2 || (word.length < 2 && !word.startsWith('@'))) {
-    acClose(); return
-  }
+  // @ triggers at 1 char (builtins list), everything else at 2+ chars
+  const minLen = word.startsWith('@') ? 1 : 2
+  if (word.length < minLen) { acClose(); return }
 
   const q = word.toLowerCase()
 
@@ -547,6 +546,530 @@ function pushRecent(p) {
 
 
 
+
+// ══════════════════════════════════════════════════════════════════════════════
+//  FERRUM STUDIO — KILLER FEATURES
+//  1. Zig Stdlib Browser — searchable docs for every std module
+//  2. Settings Panel — theme, font size, tab size, minimap toggle
+//  3. Minimap — right-side code overview
+//  4. True Multi-cursor — Ctrl+D adds cursor at next match
+//  5. Memory leak detection — parse GPA output automatically
+//  6. Font zoom — Ctrl+= / Ctrl+-
+//  7. Zig version switcher — switch between installed Zig versions
+// ══════════════════════════════════════════════════════════════════════════════
+
+// ── Settings state ─────────────────────────────────────────────────────────
+const PREFS = {
+  fontSize:  parseInt(localStorage.getItem('fs:fontSize')  || '13'),
+  tabSize:   parseInt(localStorage.getItem('fs:tabSize')   || '4'),
+  minimap:   localStorage.getItem('fs:minimap') !== 'false',
+  theme:     localStorage.getItem('fs:theme') || 'dark',
+  lineWrap:  localStorage.getItem('fs:lineWrap') === 'true',
+}
+
+function savePrefs() {
+  localStorage.setItem('fs:fontSize', PREFS.fontSize)
+  localStorage.setItem('fs:tabSize',  PREFS.tabSize)
+  localStorage.setItem('fs:minimap',  PREFS.minimap)
+  localStorage.setItem('fs:theme',    PREFS.theme)
+  localStorage.setItem('fs:lineWrap', PREFS.lineWrap)
+}
+
+function applyPrefs() {
+  // Font size
+  const fs = Math.max(10, Math.min(24, PREFS.fontSize))
+  const lh = Math.round(fs * 1.692)  // maintains 22/13 ratio
+  document.documentElement.style.setProperty('--fs-editor', fs + 'px')
+  document.documentElement.style.setProperty('--lh', lh + 'px')
+  const editorEls = document.querySelectorAll('#editor-ta, .hl')
+  editorEls.forEach(el => { el.style.fontSize = fs + 'px'; el.style.lineHeight = lh + 'px' })
+
+  // Tab size
+  const ts = PREFS.tabSize
+  document.querySelectorAll('#editor-ta, .hl').forEach(el => el.style.tabSize = ts)
+
+  // Minimap
+  const mm = document.getElementById('minimap')
+  if (mm) mm.style.display = PREFS.minimap ? 'block' : 'none'
+
+  // Theme
+  applyTheme(PREFS.theme)
+}
+
+const THEMES = {
+  dark: {
+    '--bg':'#0c0c12','--bg1':'#111119','--bg2':'#17171f','--bg3':'#1e1e28','--bg4':'#252533',
+    '--bdr':'#252535','--bdr2':'#353550',
+    '--tx0':'#ededf5','--tx1':'#9090b0','--tx2':'#505068',
+    '--acc':'#f97316',
+    '--hk':'#c084fc','--ht':'#4ade80','--hT':'#67e8f9','--hb':'#60a5fa',
+    '--hs':'#fbbf24','--hn':'#fb923c','--hc':'#44445a','--hf':'#e2e8f0',
+  },
+  light: {
+    '--bg':'#f8f8fc','--bg1':'#f0f0f6','--bg2':'#e8e8f0','--bg3':'#dcdce8','--bg4':'#c8c8d8',
+    '--bdr':'#d0d0e0','--bdr2':'#b8b8cc',
+    '--tx0':'#1a1a2e','--tx1':'#4a4a6a','--tx2':'#8888aa',
+    '--acc':'#e55a00',
+    '--hk':'#7c3aed','--ht':'#16a34a','--hT':'#0891b2','--hb':'#2563eb',
+    '--hs':'#b45309','--hn':'#c2410c','--hc':'#9ca3af','--hf':'#111827',
+  },
+  monokai: {
+    '--bg':'#272822','--bg1':'#1e1f1c','--bg2':'#2d2e27','--bg3':'#35362e','--bg4':'#414237',
+    '--bdr':'#414237','--bdr2':'#55564a',
+    '--tx0':'#f8f8f2','--tx1':'#cfcfc2','--tx2':'#75715e',
+    '--acc':'#fd971f',
+    '--hk':'#f92672','--ht':'#66d9e8','--hT':'#a6e22e','--hb':'#ae81ff',
+    '--hs':'#e6db74','--hn':'#ae81ff','--hc':'#75715e','--hf':'#a6e22e',
+  },
+  oceanic: {
+    '--bg':'#1b2b34','--bg1':'#1b2b34','--bg2':'#223040','--bg3':'#2a3f4f','--bg4':'#344d5e',
+    '--bdr':'#2f4555','--bdr2':'#3d5568',
+    '--tx0':'#cdd3de','--tx1':'#99a9b4','--tx2':'#5a7080',
+    '--acc':'#6699cc',
+    '--hk':'#c594c5','--ht':'#99c794','--hT':'#5fb3b3','--hb':'#6699cc',
+    '--hs':'#99c794','--hn':'#f99157','--hc':'#5a7080','--hf':'#cdd3de',
+  },
+}
+
+function applyTheme(name) {
+  const t = THEMES[name] || THEMES.dark
+  const root = document.documentElement
+  Object.entries(t).forEach(([k, v]) => root.style.setProperty(k, v))
+  // Update syntax token colors
+  const style = document.getElementById('theme-tokens') || (() => {
+    const s = document.createElement('style'); s.id = 'theme-tokens'; document.head.appendChild(s); return s
+  })()
+  style.textContent = [
+    `.hk{color:${t['--hk']};font-weight:500}`,
+    `.ht{color:${t['--ht']}}`,
+    `.hT{color:${t['--hT']}}`,
+    `.hb{color:${t['--hb']}}`,
+    `.hs{color:${t['--hs']}}`,
+    `.hn{color:${t['--hn']}}`,
+    `.hc{color:${t['--hc']};font-style:italic}`,
+    `.hdc{color:${t['--hc']};font-style:italic}`,
+    `.hf{color:${t['--hf']}}`,
+    `.hi{color:${t['--tx0']}}`,
+  ].join('\n')
+}
+
+// ── Settings panel ─────────────────────────────────────────────────────────
+function buildSettingsPanel() {
+  const wrap = mk('div', 'sb-panel-inner')
+  const hdr = mk('div', 'sb-hdr')
+  hdr.innerHTML = '<span class="sb-title">SETTINGS</span>'
+  wrap.appendChild(hdr)
+
+  const body = mk('div', 'settings-body')
+
+  // Theme
+  body.innerHTML = `
+    <div class="setting-group">
+      <div class="setting-label">Color Theme</div>
+      <div class="setting-themes">
+        ${Object.keys(THEMES).map(t =>
+          `<button class="theme-btn${PREFS.theme===t?' active':''}" data-theme="${t}">${t.charAt(0).toUpperCase()+t.slice(1)}</button>`
+        ).join('')}
+      </div>
+    </div>
+    <div class="setting-group">
+      <div class="setting-label">Font Size <span class="setting-val" id="fs-val">${PREFS.fontSize}px</span></div>
+      <input type="range" class="setting-range" id="fs-range" min="10" max="22" value="${PREFS.fontSize}">
+      <div class="setting-hint">Ctrl+= / Ctrl+- to zoom</div>
+    </div>
+    <div class="setting-group">
+      <div class="setting-label">Tab Size <span class="setting-val" id="ts-val">${PREFS.tabSize}</span></div>
+      <div class="setting-row">
+        ${[2,4,8].map(n => `<button class="tab-size-btn${PREFS.tabSize===n?' active':''}" data-ts="${n}">${n} spaces</button>`).join('')}
+      </div>
+    </div>
+    <div class="setting-group">
+      <div class="setting-label">Minimap</div>
+      <label class="toggle-label">
+        <input type="checkbox" id="minimap-toggle" ${PREFS.minimap?'checked':''}>
+        <span class="toggle-track"></span>
+        <span class="toggle-text">Show minimap</span>
+      </label>
+    </div>
+    <div class="setting-group">
+      <div class="setting-label">Zig Path</div>
+      <div class="setting-zig-path" id="zig-path-display" style="font-family:var(--mono);font-size:11px;color:var(--tx2);padding:4px 0;word-break:break-all"></div>
+      <div class="setting-row" style="margin-top:6px">
+        <button class="wbtn small" id="settings-retry-zig">↻ Retry detect</button>
+        <button class="wbtn small" id="settings-browse-zig">📂 Browse…</button>
+      </div>
+    </div>
+    <div class="setting-group">
+      <div class="setting-label">About</div>
+      <div class="setting-hint">Ferrum Studio — The Zig IDE</div>
+      <div class="setting-hint">Built with Wails + Go + Vanilla JS</div>
+      <div class="setting-hint">Open source. Made for Zig developers.</div>
+    </div>`
+
+  wrap.appendChild(body)
+
+  // Wire events after insertion
+  setTimeout(() => {
+    // Theme buttons
+    document.querySelectorAll('.theme-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        PREFS.theme = btn.dataset.theme
+        savePrefs(); applyPrefs()
+        document.querySelectorAll('.theme-btn').forEach(b => b.classList.toggle('active', b.dataset.theme === PREFS.theme))
+      })
+    })
+    // Font size range
+    const fsr = document.getElementById('fs-range')
+    const fsv = document.getElementById('fs-val')
+    fsr?.addEventListener('input', () => {
+      PREFS.fontSize = parseInt(fsr.value)
+      if (fsv) fsv.textContent = PREFS.fontSize + 'px'
+      savePrefs(); applyPrefs()
+      // Resize textarea to match new font metrics
+      const tab = activeTab()
+      if (tab) setTimeout(() => resizeTextarea(tab), 60)
+    })
+    // Tab size buttons
+    document.querySelectorAll('.tab-size-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        PREFS.tabSize = parseInt(btn.dataset.ts)
+        savePrefs(); applyPrefs()
+        document.querySelectorAll('.tab-size-btn').forEach(b => b.classList.toggle('active', parseInt(b.dataset.ts) === PREFS.tabSize))
+        document.getElementById('ts-val').textContent = PREFS.tabSize
+      })
+    })
+    // Minimap toggle
+    document.getElementById('minimap-toggle')?.addEventListener('change', e => {
+      PREFS.minimap = e.target.checked
+      savePrefs(); applyPrefs()
+    })
+    // Zig path display
+    const zpd = document.getElementById('zig-path-display')
+    if (zpd) zpd.textContent = S.zigInfo?.path || 'not found'
+    // Retry / Browse
+    document.getElementById('settings-retry-zig')?.addEventListener('click', async () => {
+      const info = await go('RetryZigDetection')
+      updateZigBadge(info)
+      if (document.getElementById('zig-path-display')) document.getElementById('zig-path-display').textContent = info?.path || 'not found'
+      tLine(info?.version !== 'not found' ? '✓ Zig: ' + info.version : '✗ Still not found', info?.version !== 'not found' ? '#4ade80' : '#f87171')
+    })
+    document.getElementById('settings-browse-zig')?.addEventListener('click', async () => {
+      const ver = await go('BrowseForZig')
+      if (ver && !ver.startsWith('not') && !ver.startsWith('error')) {
+        const info = await go('GetZigInfo'); updateZigBadge(info)
+        if (document.getElementById('zig-path-display')) document.getElementById('zig-path-display').textContent = info?.path || ''
+        tLine('✓ Zig set: ' + ver, '#4ade80')
+      }
+    })
+  }, 0)
+  return wrap
+}
+
+// ── Zig Stdlib Docs Browser ─────────────────────────────────────────────────
+const STD_DOCS = [
+  { name:'std.io',       desc:'I/O streams, readers, writers',
+    members:['getStdOut() File.Writer','getStdIn() File.Reader','getStdErr() File.Writer','Reader','Writer','BufferedReader(T)','BufferedWriter(T)','AnyReader','AnyWriter'] },
+  { name:'std.fmt',      desc:'Formatting, printing, parsing',
+    members:['allocPrint(alloc, fmt, args) ![]u8','bufPrint(buf, fmt, args) ![]u8','parseInt(T, str, base) !T','parseFloat(T, str) !T','format(writer, fmt, args) !void','countFmt(fmt, args) usize'] },
+  { name:'std.mem',      desc:'Memory manipulation and allocators',
+    members:['eql(T, a, b) bool','copy(T, dest, src)','concat(T, alloc, slices) ![]T','split(T, buf, delim) SplitIter','tokenize(T, buf, delim) TokenIter','trim(T, slice, vals) []T','startsWith(T, s, prefix) bool','endsWith(T, s, suffix) bool','indexOf(T, s, needle) ?usize','Allocator','zeroes(T) T','bytesAsSlice(T, bytes) []T','sliceAsBytes(slice) []u8'] },
+  { name:'std.math',     desc:'Math functions and constants',
+    members:['sqrt(x) T','abs(x) T','min(a,b) T','max(a,b) T','pow(T, base, exp) T','log(x) T','log2(x) T','ceil(x) T','floor(x) T','round(x) T','sin(x) T','cos(x) T','tan(x) T','pi: comptime_float','inf: comptime_float','nan: comptime_float','maxInt(T) comptime_int','minInt(T) comptime_int','clamp(val,lo,hi) T'] },
+  { name:'std.testing',  desc:'Test assertions and utilities',
+    members:['expect(ok: bool) !void','expectEqual(exp, act) !void','expectEqualStrings(exp, act) !void','expectEqualSlices(T, exp, act) !void','expectError(err, expr) !void','expectApproxEqAbs(exp, act, tol) !void','allocator: Allocator','refAllDecls(T)'] },
+  { name:'std.debug',    desc:'Debugging utilities',
+    members:['print(fmt, args)','assert(ok: bool)','panic(fmt, args) noreturn','dumpCurrentStackTrace(ret_addr)'] },
+  { name:'std.heap',     desc:'Memory allocators',
+    members:['page_allocator: Allocator','GeneralPurposeAllocator(.{}) — leak detection','ArenaAllocator.init(child) — free all at once','FixedBufferAllocator.init(buf) — stack backed','c_allocator: Allocator — libc malloc/free'] },
+  { name:'std.fs',       desc:'Filesystem access',
+    members:['cwd() Dir','openFileAbsolute(path, flags) !File','createFileAbsolute(path, flags) !File','Dir.openFile(path, flags) !File','Dir.createFile(path, flags) !File','Dir.makeDir(path) !void','Dir.deleteFile(path) !void','Dir.deleteDir(path) !void','Dir.iterate() Iterator','File.read(buf) !usize','File.write(buf) !usize','File.close()'] },
+  { name:'std.process',  desc:'Process and environment',
+    members:['argsAlloc(alloc) ![][]u8','argsFree(alloc, args)','exit(code: u8) noreturn','getEnvVarOwned(alloc, name) ![]u8','getEnvMap(alloc) !EnvMap','abort() noreturn'] },
+  { name:'std.os',       desc:'Low-level OS primitives (prefer std.fs)',
+    members:['windows','linux','darwin','posix','getenv(name) ?[]const u8','exit(status: u8) noreturn'] },
+  { name:'std.net',      desc:'Networking',
+    members:['Address.parseIp(addr, port) !Address','Address.listen(opts) !Server','tcpConnectToHost(alloc, host, port) !Stream','Stream.read(buf) !usize','Stream.write(buf) !usize','Stream.close()'] },
+  { name:'std.time',     desc:'Time and timers',
+    members:['milliTimestamp() i64','microTimestamp() i64','nanoTimestamp() i128','sleep(nanoseconds: u64)','Timer.start() !Timer','Timer.read() u64','Timer.lap() u64'] },
+  { name:'std.ArrayList',desc:'Dynamic array',
+    members:['init(alloc) ArrayList(T)','deinit()','append(item) !void','appendSlice(items) !void','pop() T','insert(i, item) !void','orderedRemove(i) T','items: []T','len: usize','capacity: usize','toOwnedSlice() ![]T','clearRetainingCapacity()'] },
+  { name:'std.HashMap',  desc:'Hash maps',
+    members:['StringHashMap(V).init(alloc)','AutoHashMap(K,V).init(alloc)','put(key, val) !void','get(key) ?V','getOrPut(key) !Entry','remove(key) bool','contains(key) bool','count() usize','iterator() Iterator','deinit()','clearRetainingCapacity()'] },
+  { name:'std.json',     desc:'JSON parsing and serialization',
+    members:['parseFromSlice(T, alloc, input, opts) !Parsed(T)','Parsed(T).deinit()','stringify(val, opts, writer) !void','stringifyAlloc(alloc, val, opts) ![]u8'] },
+  { name:'std.crypto',   desc:'Cryptography primitives',
+    members:['random: std.rand.Random','hash.sha2.Sha256.hash(msg, out, opts)','hash.blake3.Blake3.hash(msg, out, opts)','aes.Aes128','hmac.HmacSha256'] },
+  { name:'std.unicode',  desc:'Unicode utilities',
+    members:['utf8Decode(bytes) !u21','utf8Encode(codepoint, buf) !u3','Utf8View.init(bytes) !Utf8View','Utf8Iterator','utf8CountCodepoints(bytes) !usize','utf8ValidateSlice(bytes) bool'] },
+  { name:'std.sort',     desc:'Sorting algorithms',
+    members:['sort(T, items, ctx, lessThan)','asc(T) fn','desc(T) fn','isSorted(T, items, ctx, lessThan) bool','binarySearch(T, key, items, ctx, order) ?usize'] },
+  { name:'std.builtin',  desc:'Compiler builtins and type info',
+    members:['Type (union with struct/enum/fn/etc info)','CallingConvention','OptimizeMode','Target','cpu.Arch','os.Tag','abi.ABI'] },
+]
+
+function buildDocsPanel() {
+  const wrap = mk('div', 'sb-panel-inner')
+  const hdr = mk('div', 'sb-hdr')
+  hdr.innerHTML = `<span class="sb-title">ZIG STDLIB</span>`
+  wrap.appendChild(hdr)
+
+  const searchRow = mk('div', 'docs-search-row')
+  const inp = mk('input', 'docs-search')
+  inp.type = 'text'
+  inp.placeholder = 'Search stdlib…'
+  inp.autocomplete = 'off'
+  searchRow.appendChild(inp)
+  wrap.appendChild(searchRow)
+
+  const list = mk('div', 'docs-list')
+  list.id = 'docs-list'
+
+  function renderDocs(query) {
+    list.innerHTML = ''
+    const q = query.toLowerCase()
+    const filtered = q
+      ? STD_DOCS.filter(m => m.name.toLowerCase().includes(q) || m.desc.toLowerCase().includes(q) || m.members.some(mb => mb.toLowerCase().includes(q)))
+      : STD_DOCS
+    filtered.forEach(mod => {
+      const modEl = mk('div', 'docs-module')
+      const modHdr = mk('div', 'docs-mod-hdr')
+      modHdr.innerHTML = `<span class="docs-mod-name">${escH(mod.name)}</span><span class="docs-mod-desc">${escH(mod.desc)}</span>`
+      modHdr.addEventListener('click', () => {
+        const body = modEl.querySelector('.docs-mod-body')
+        body.classList.toggle('hidden')
+        modHdr.classList.toggle('open')
+      })
+      const body = mk('div', 'docs-mod-body' + (q ? '' : ' hidden'))
+      const filteredMembers = q
+        ? mod.members.filter(m => m.toLowerCase().includes(q))
+        : mod.members
+      filteredMembers.forEach(member => {
+        const row = mk('div', 'docs-member')
+        const parts = member.split(' — ')
+        const sig = parts[0].trim()
+        const note = parts[1] || ''
+        row.innerHTML = `<span class="docs-sig">${escH(sig)}</span>${note ? `<span class="docs-note">${escH(note)}</span>` : ''}`
+        // Click to insert at cursor
+        row.title = 'Click to insert: ' + mod.name + '.' + sig.split('(')[0]
+        row.addEventListener('click', () => {
+          const ta = document.getElementById('editor-ta')
+          if (!ta) return
+          const { selectionStart: s, selectionEnd: e, value: v } = ta
+          const insert = mod.name + '.' + sig.split('(')[0].split(':')[0].trim()
+          ta.value = v.slice(0, s) + insert + v.slice(e)
+          ta.selectionStart = ta.selectionEnd = s + insert.length
+          ta.dispatchEvent(new Event('input'))
+          ta.focus()
+        })
+        body.appendChild(row)
+      })
+      modEl.append(modHdr, body)
+      list.appendChild(modEl)
+    })
+    if (!filtered.length) {
+      list.innerHTML = '<div class="docs-empty">No matches for "' + escH(q) + '"</div>'
+    }
+  }
+
+  renderDocs('')
+  inp.addEventListener('input', () => renderDocs(inp.value))
+  wrap.appendChild(list)
+  return wrap
+}
+
+// ── Minimap ──────────────────────────────────────────────────────────────────
+function buildMinimap() {
+  const mm = mk('div', 'minimap')
+  mm.id = 'minimap'
+  if (!PREFS.minimap) mm.style.display = 'none'
+  const canvas = document.createElement('canvas')
+  canvas.id = 'minimap-canvas'
+  canvas.width = 120
+  mm.appendChild(canvas)
+  // Viewport indicator
+  const vp = mk('div', 'minimap-vp')
+  vp.id = 'minimap-vp'
+  mm.appendChild(vp)
+  // Click to scroll
+  mm.addEventListener('click', e => {
+    const pane = document.getElementById('code-pane')
+    if (!pane) return
+    const rect = mm.getBoundingClientRect()
+    const frac = (e.clientY - rect.top) / rect.height
+    pane.scrollTop = frac * pane.scrollHeight
+  })
+  return mm
+}
+
+let _mmRaf = 0
+function updateMinimap() {
+  if (!PREFS.minimap) return
+  cancelAnimationFrame(_mmRaf)
+  _mmRaf = requestAnimationFrame(() => {
+    const canvas = document.getElementById('minimap-canvas')
+    const mm = document.getElementById('minimap')
+    const pane = document.getElementById('code-pane')
+    const tab = activeTab()
+    if (!canvas || !mm || !pane || !tab) return
+
+    const mmH = mm.clientHeight || 400
+    canvas.height = mmH
+    canvas.width  = 120
+    const ctx = canvas.getContext('2d')
+    ctx.clearRect(0, 0, 120, mmH)
+
+    const lines = tab.content.split('\n')
+    const totalLines = lines.length
+    const lineH = Math.max(1, mmH / totalLines)
+    const isDark = PREFS.theme !== 'light'
+
+    lines.forEach((line, i) => {
+      const y = i * lineH
+      const trimmed = line.trim()
+      // Color by content type
+      let color = isDark ? 'rgba(144,144,176,.35)' : 'rgba(80,80,100,.3)'
+      if (/^\s*\/\//.test(line)) color = isDark ? 'rgba(68,68,90,.7)' : 'rgba(130,130,150,.5)'
+      else if (/^\s*(pub fn|fn )\b/.test(line)) color = isDark ? 'rgba(192,132,252,.7)' : 'rgba(100,60,180,.7)'
+      else if (/^\s*(const|var)\b/.test(line)) color = isDark ? 'rgba(96,165,250,.5)' : 'rgba(37,99,235,.5)'
+      else if (/^\s*(if|for|while|switch)\b/.test(line)) color = isDark ? 'rgba(249,115,22,.5)' : 'rgba(200,80,0,.5)'
+      else if (/"/.test(line)) color = isDark ? 'rgba(251,191,36,.4)' : 'rgba(180,120,0,.5)'
+
+      const len = Math.min(trimmed.length * 0.8, 115)
+      const indent = (line.length - trimmed.length) * 0.8
+      ctx.fillStyle = color
+      ctx.fillRect(indent, y, len, Math.max(1, lineH * 0.7))
+    })
+
+    // Viewport box
+    const vp = document.getElementById('minimap-vp')
+    if (vp && pane.scrollHeight > pane.clientHeight) {
+      const frac = pane.scrollTop / pane.scrollHeight
+      const vpH  = (pane.clientHeight / pane.scrollHeight) * mmH
+      vp.style.top    = (frac * mmH) + 'px'
+      vp.style.height = vpH + 'px'
+    }
+  })
+}
+
+// ── Multi-cursor (true Ctrl+D) ───────────────────────────────────────────────
+// We store extra cursor positions and render them as overlays
+const MC = { cursors: [], active: false }
+
+function mcAddNextMatch(ta) {
+  const { selectionStart: s, selectionEnd: e, value: v } = ta
+  const word = v.slice(s, e)
+  if (!word || word.includes('\n')) return false
+
+  // Find next occurrence after current selection
+  const start = MC.cursors.length > 0
+    ? MC.cursors[MC.cursors.length - 1].end
+    : e
+  const next = v.indexOf(word, start)
+  if (next === -1 || next === s) return false // wrapped or same
+
+  MC.cursors.push({ start: next, end: next + word.length })
+  MC.active = true
+  renderMultiCursors(ta)
+  return true
+}
+
+function renderMultiCursors(ta) {
+  // Remove old overlays
+  document.querySelectorAll('.mc-highlight').forEach(el => el.remove())
+
+  const hl = document.getElementById('hl')
+  const pane = document.getElementById('code-pane')
+  if (!hl || !pane || !MC.active) return
+
+  const v = ta.value
+  MC.cursors.forEach(({ start, end }) => {
+    const before = v.slice(0, start)
+    const lineNo  = (before.match(/\n/g) || []).length
+    const col     = before.length - before.lastIndexOf('\n') - 1
+    const lineH   = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--lh')) || 22
+    const charW   = PREFS.fontSize * 0.615
+
+    const highlight = mk('div', 'mc-highlight')
+    highlight.style.cssText =
+      'position:absolute;' +
+      'top:' + (12 + lineNo * lineH) + 'px;' +
+      'left:' + (16 + col * charW) + 'px;' +
+      'width:' + ((end - start) * charW) + 'px;' +
+      'height:' + lineH + 'px;' +
+      'background:rgba(249,115,22,.25);' +
+      'pointer-events:none;z-index:4;'
+    document.getElementById('editor-inner')?.appendChild(highlight)
+  })
+}
+
+function mcClear() {
+  MC.cursors = []; MC.active = false
+  document.querySelectorAll('.mc-highlight').forEach(el => el.remove())
+}
+
+function mcApplyToAll(ta, fn) {
+  // Apply an edit function at each extra cursor position
+  if (!MC.active || !MC.cursors.length) return
+  let v = ta.value
+  let offset = 0
+  // Sort cursors by position
+  const sorted = [...MC.cursors].sort((a, b) => a.start - b.start)
+  sorted.forEach(({ start, end }) => {
+    const adjStart = start + offset
+    const adjEnd   = end   + offset
+    const result   = fn(v, adjStart, adjEnd)
+    offset += result.inserted.length - (adjEnd - adjStart)
+    v = result.newValue
+  })
+  ta.value = v
+  ta.dispatchEvent(new Event('input'))
+  mcClear()
+}
+
+// ── Font zoom ────────────────────────────────────────────────────────────────
+function zoomFont(delta) {
+  PREFS.fontSize = Math.max(10, Math.min(24, PREFS.fontSize + delta))
+  savePrefs(); applyPrefs()
+  const tab = activeTab()
+  if (tab) setTimeout(() => resizeTextarea(tab), 60)
+  tLine('Font size: ' + PREFS.fontSize + 'px', '#60a5fa')
+}
+
+// ── Memory leak detector ─────────────────────────────────────────────────────
+// Parses GPA leak output from zig run/test and adds to Problems panel
+function parseLeaks(output) {
+  const leaks = []
+  // Pattern: "leak at address 0x..., allocated here:"
+  // or GPA output: "N bytes of memory were not freed"
+  const bytePattern = /(\d+) bytes? of memory (?:was|were) not freed/
+  const leakPattern = /memory address 0x[0-9a-f]+ leaked/i
+  const tracePattern = /^\s*.*?:(\d+):(\d+):\s*(.*)/
+
+  const lines = output.split('\n')
+  let inLeak = false
+  lines.forEach((line, i) => {
+    if (bytePattern.test(line) || leakPattern.test(line)) {
+      inLeak = true
+    }
+    if (inLeak) {
+      const m = line.match(/([^:]+\.zig):(\d+):(\d+)/)
+      if (m) {
+        leaks.push({
+          file:    m[1],
+          line:    parseInt(m[2]),
+          col:     parseInt(m[3]),
+          kind:    'warning',
+          message: 'Memory leak detected here',
+          source:  'GPA',
+        })
+        inLeak = false
+      }
+    }
+  })
+  return leaks
+}
+
+
 // ── Boot ──────────────────────────────────────────────────────────────────────
 async function boot() {
   S.tabs.push({ id:'demo', path:null, name:'main.zig', content:DEMO, dirty:false, lang:'zig' })
@@ -562,6 +1085,8 @@ async function boot() {
     updateZigBadge(info)
   })
   go('GetBuildSteps').then(steps => { if(steps) S.buildSteps = steps; renderBuildPanel() })
+  // Restore font size from last session
+  if (_fontSize !== 13) applyFontSize(_fontSize)
   go('GetGitStatus').then(gs => { if(gs) { S.gitStatus=gs; updateGitUI() } })
 }
 
@@ -581,6 +1106,7 @@ function buildApp() {
     tplDlg,
   )
   app.appendChild(ide)
+  applyPrefs()
 }
 
 // ── Titlebar ──────────────────────────────────────────────────────────────────
@@ -625,9 +1151,31 @@ function buildMainArea() {
   const main = mk('div','main-area')
   const rv = mk('div','resize-v'); rv.dataset.drag='sb'
   const col = mk('div','editor-col')
-  col.append(buildTabBar(), buildEditorArea(), buildResizeH(), buildBottomPanel())
+  col.append(buildTabBar(), buildBreadcrumb(), buildEditorArea(), buildResizeH(), buildBottomPanel())
   main.append(buildSidebar(), rv, col)
   return main
+}
+
+function buildBreadcrumb() {
+  const bar = mk('div','breadcrumb'); bar.id='breadcrumb'
+  updateBreadcrumb(bar)
+  return bar
+}
+
+function updateBreadcrumb(bar) {
+  bar = bar || document.getElementById('breadcrumb')
+  if (!bar) return
+  const tab = activeTab()
+  if (!tab || !tab.path) {
+    bar.innerHTML = '<span class="bc-item bc-dim">Ferrum Studio</span>'
+    return
+  }
+  const parts = tab.path.replace(/\\/g, '/').split('/')
+  bar.innerHTML = parts.map((part, i) => {
+    const isLast = i === parts.length - 1
+    const sep = i > 0 ? '<span class="bc-sep">›</span>' : ''
+    return sep + '<span class="bc-item' + (isLast ? ' bc-active' : '') + '">' + escH(part) + '</span>'
+  }).join('')
 }
 
 // ── Sidebar with activity bar ─────────────────────────────────────────────────
@@ -659,12 +1207,18 @@ function buildSidebar() {
         <line x1="14" y1="12" x2="14" y2="14" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
       </svg>
     </button>
-    <button class="act-btn" data-pnl="ai" title="AI Assistant (Gemini)">
+    <button class="act-btn" data-pnl="docs" title="Zig Docs Browser">
       <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-        <path d="M9 2C5.13 2 2 5.13 2 9s3.13 7 7 7 7-3.13 7-7-3.13-7-7-7z" stroke="currentColor" stroke-width="1.3"/>
-        <path d="M9 5v4l2.5 2.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
-        <circle cx="9" cy="9" r="1.2" fill="currentColor"/>
-        <path d="M6 13.5C6.8 14.4 7.8 15 9 15" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+        <rect x="2" y="2" width="14" height="14" rx="2" stroke="currentColor" stroke-width="1.3"/>
+        <line x1="5" y1="6" x2="13" y2="6" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+        <line x1="5" y1="9" x2="13" y2="9" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+        <line x1="5" y1="12" x2="9" y2="12" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+      </svg>
+    </button>
+    <button class="act-btn" data-pnl="settings" title="Settings">
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+        <circle cx="9" cy="9" r="2.5" stroke="currentColor" stroke-width="1.3"/>
+        <path d="M9 1v2M9 15v2M1 9h2M15 9h2M3.2 3.2l1.4 1.4M13.4 13.4l1.4 1.4M3.2 14.8l1.4-1.4M13.4 4.6l1.4-1.4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
       </svg>
     </button>`
 
@@ -696,7 +1250,11 @@ function buildSidebar() {
   const snipPanel = mk('div','sb-panel hidden'); snipPanel.id='pnl-snippets'
   snipPanel.appendChild(buildSnippetsPanel())
 
-  content.append(explorer, buildPanel, snipPanel)
+  const docsPanel = mk('div','sb-panel hidden'); docsPanel.id='pnl-docs'
+  docsPanel.appendChild(buildDocsPanel())
+  const settingsPanel = mk('div','sb-panel hidden'); settingsPanel.id='pnl-settings'
+  settingsPanel.appendChild(buildSettingsPanel())
+  content.append(explorer, buildPanel, snipPanel, docsPanel, settingsPanel)
   sb.append(act, content)
   return sb
 }
@@ -1022,8 +1580,10 @@ function buildEditorArea() {
 
   area.append(gutter, pane)
 
-  // Size textarea to match hl after first paint
-  requestAnimationFrame(function(){ resizeTextarea(tab) })
+  // Let hl render fully before measuring (two frames = safe on all GPUs)
+  requestAnimationFrame(function() {
+    requestAnimationFrame(function() { resizeTextarea(tab) })
+  })
   return area
 }
 
@@ -1032,6 +1592,7 @@ function onPaneScroll() {
   const pane = document.getElementById('code-pane')
   const gu   = document.getElementById('gutter')
   if (pane && gu) gu.scrollTop = pane.scrollTop
+  updateMinimap()
 }
 
 // Resize textarea to exactly match the hl layer dimensions so the caret
@@ -1108,6 +1669,9 @@ function buildWelcome() {
       <div class="wlc-feat"><span class="feat-key">Ctrl+P</span><span>Quick Open</span></div>
       <div class="wlc-feat"><span class="feat-key">Ctrl+F</span><span>Find in file</span></div>
       <div class="wlc-feat"><span class="feat-key">Ctrl+G</span><span>Go to line</span></div>
+      <div class="wlc-feat"><span class="feat-key">Ctrl+=</span><span>Bigger font</span></div>
+      <div class="wlc-feat"><span class="feat-key">Ctrl+-</span><span>Smaller font</span></div>
+      <div class="wlc-feat"><span class="feat-key">Ctrl+Shift+W</span><span>Word wrap</span></div>
       <div class="wlc-feat"><span class="feat-key">Ctrl+W</span><span>Close tab</span></div>
       <div class="wlc-feat"><span class="feat-key">Ctrl+D</span><span>Select next</span></div>
       <div class="wlc-feat"><span class="feat-key">Tab</span><span>Expand snippet</span></div>
@@ -1441,6 +2005,9 @@ function onGlobalKey(e) {
   if (mod&&e.key==='f')             { e.preventDefault(); openFind(); return }
   if (mod&&e.key==='p')             { e.preventDefault(); openQuickOpen(); return }
   if (mod&&e.key==='g')             { e.preventDefault(); openGotoLine(); return }
+  if (mod&&(e.key==='='||e.key==='+')){ e.preventDefault(); zoomFont(1); return }
+  if (mod&&e.key==='-')              { e.preventDefault(); zoomFont(-1); return }
+  if (mod&&e.key==='0')              { e.preventDefault(); PREFS.fontSize=13; savePrefs(); applyPrefs(); return }
   if (mod&&e.key==='n')             { e.preventDefault(); cmdNewFile(); return }
   if (mod&&e.key==='o')             { e.preventDefault(); cmdOpenFile(); return }
   if (mod&&e.key==='w')             { e.preventDefault(); closeActiveTab(); return }
@@ -1449,6 +2016,10 @@ function onGlobalKey(e) {
   if (e.key==='F7')                 { e.preventDefault(); cmdBuild(); return }
   if (e.key==='F8')                 { e.preventDefault(); cmdTest(); return }
   if (e.key==='Escape')             { closeAllDialogs(); closeFind(); closeQuickOpen(); return }
+  // Font size
+  if (mod && (e.key==='+' || e.key==='=' || e.key==='+')) { e.preventDefault(); adjustFontSize(1); return }
+  if (mod && e.key==='-')             { e.preventDefault(); adjustFontSize(-1); return }
+  if (mod && e.key==='0')             { e.preventDefault(); adjustFontSize(0); return }
   if (mod&&e.key==='a' && document.activeElement?.id!=='editor-ta') {
     // Ctrl+A in editor is native; only intercept when editor isn't focused
     const ta = document.getElementById('editor-ta')
@@ -1526,6 +2097,7 @@ function dispatch(a, el, e) {
       ['Quick Open       Ctrl+P',    'do:quickopen'],
       null,
       ['Format     Ctrl+Shift+F',    'z:fmt'],
+      ['Word Wrap  Ctrl+Shift+W',  'do:wordwrap'],
       ['Check      Ctrl+Shift+C',    'z:check'],
       ['Comment/Uncomment Ctrl+/',   'do:comment'],
     ]); break
@@ -1560,7 +2132,9 @@ function dispatch(a, el, e) {
       ['Clear Terminal',   'term:clear'],
     ]); break
     case 'do:comment': toggleComment(); break
+    case 'do:wordwrap': toggleWordWrap(); break
     case 'do:gotoline': openGotoLine(); break
+    case 'settings:open': $$('.act-btn').forEach(b=>b.classList.remove('active')); document.querySelector('[data-pnl="settings"]')?.classList.add('active'); $$('.sb-panel').forEach(p=>p.classList.toggle('hidden',p.id!=='pnl-settings')); break
     case 'zig:build':    runZig('build'); break
     case 'zig:build-exe':{ const t=activeTab(); if(t?.path)runZig(`build-exe ${t.path}`); break }
     case 'zig:build-lib':{ const t=activeTab(); if(t?.path)runZig(`build-lib ${t.path}`); break }
@@ -1612,6 +2186,61 @@ function updateCursorPos(ta) {
   if (el) el.textContent = 'Ln ' + lineNo + ', Col ' + col
   var cl = document.getElementById('cur-line-hl')
   if (cl) cl.style.top = (12 + (lineNo - 1) * 22) + 'px'
+  // Bracket match highlight
+  highlightMatchingBracket(ta)
+}
+
+function highlightMatchingBracket(ta) {
+  // Remove old highlights
+  document.querySelectorAll('.br-match').forEach(el => el.classList.remove('br-match'))
+  if (!ta) return
+  const v = ta.value
+  const pos = ta.selectionStart
+  if (pos === 0 && pos === ta.selectionEnd) return
+  const open  = '([{'
+  const close = ')]}'
+  const ch = v[pos] || v[pos-1]
+  if (!ch) return
+  const isOpen  = open.includes(ch)
+  const isClose = close.includes(ch)
+  if (!isOpen && !isClose) return
+  const startPos = open.includes(v[pos]) ? pos : pos - 1
+  const startCh  = v[startPos]
+  const isSearchingClose = open.includes(startCh)
+  const matchOpen  = isSearchingClose ? startCh : close[open.indexOf(startCh) >= 0 ? open.indexOf(startCh) : close.indexOf(startCh)]
+  const matchClose = isSearchingClose ? close[open.indexOf(startCh)] : startCh
+  let depth = 0, matchPos = -1
+  if (isSearchingClose) {
+    for (let i = startPos; i < v.length; i++) {
+      if (v[i] === matchOpen) depth++
+      else if (v[i] === matchClose) { depth--; if (depth === 0) { matchPos = i; break } }
+    }
+  } else {
+    for (let i = startPos; i >= 0; i--) {
+      if (v[i] === matchClose) depth++
+      else if (v[i] === matchOpen) { depth--; if (depth === 0) { matchPos = i; break } }
+    }
+  }
+  if (matchPos === -1) return
+  // Find the .cl div for each position and add class
+  const hl = document.getElementById('hl')
+  if (!hl) return
+  function lineColOf(p) {
+    const before = v.slice(0, p)
+    const ln = (before.match(/\n/g) || []).length
+    const col = p - before.lastIndexOf('') - 1
+    return { ln, col }
+  }
+  function markBracket(p) {
+    const { ln, col } = lineColOf(p)
+    const lineEl = hl.children[ln]
+    if (!lineEl) return
+    // We can't easily mark a single char in the rendered HTML,
+    // so just add a subtle glow to the whole line div
+    lineEl.classList.add('br-match')
+  }
+  markBracket(startPos)
+  markBracket(matchPos)
 }
 
 async function autoCheck(tab) {
@@ -1708,9 +2337,39 @@ function onEditorKey(e) {
     if (v[s]===e.key) { e.preventDefault(); ta.selectionStart=ta.selectionEnd=s+1; return }
   }
 
+  // Smart Home — go to first non-whitespace, then column 0 on second press
+  if (e.key === 'Home' && !e.ctrlKey) {
+    e.preventDefault()
+    const { selectionStart: pos, value: v } = ta
+    const lineStart = v.lastIndexOf('\n', pos-1) + 1
+    const lineText = v.slice(lineStart, pos)
+    const firstNonWs = lineStart + lineText.match(/^(\s*)/)[1].length
+    // If already at first non-ws, go to column 0; otherwise go to first non-ws
+    const target = pos === firstNonWs ? lineStart : firstNonWs
+    if (e.shiftKey) {
+      ta.setSelectionRange(ta.selectionEnd !== pos ? ta.selectionStart : pos, target)
+    } else {
+      ta.setSelectionRange(target, target)
+    }
+    updateCursorPos(ta)
+    return
+  }
+
   // Ctrl+D — select next occurrence
-  if ((e.ctrlKey||e.metaKey)&&e.key==='d') { e.preventDefault(); selectNext(ta); return }
+  if ((e.ctrlKey||e.metaKey)&&e.key==='d') {
+    e.preventDefault()
+    const s=ta.selectionStart, en=ta.selectionEnd
+    if (s===en) { selectNext(ta); return }  // no selection: select word
+    if (!mcAddNextMatch(ta)) {
+      // No more matches — wrap around
+      MC.cursors=[]; MC.active=false
+      mcAddNextMatch(ta)
+    }
+    return
+  }
+  if (e.key==='Escape') { mcClear(); return }
   if ((e.ctrlKey||e.metaKey)&&e.key==='s') { e.preventDefault(); cmdSaveAndCheck(); return }
+  if ((e.ctrlKey||e.metaKey)&&e.shiftKey&&e.key==='W') { e.preventDefault(); toggleWordWrap(); return }
   if ((e.ctrlKey||e.metaKey)&&e.key==='/')  { e.preventDefault(); toggleComment(); return }
 }
 
@@ -1728,6 +2387,7 @@ function onEditorClick(e) {
 const _lineCache = []
 
 function redrawHL() {
+  updateMinimap()
   const hl = document.getElementById('hl')
   const tab = activeTab()
   if (!hl || !tab) return
@@ -1854,6 +2514,20 @@ function toggleFold(lineNo) {
   console.log('fold', lineNo)
 }
 
+let _wordWrap = false
+function toggleWordWrap() {
+  _wordWrap = !_wordWrap
+  const ta    = document.getElementById('editor-ta')
+  const hl    = document.getElementById('hl')
+  const inner = document.getElementById('editor-inner')
+  const pane  = document.getElementById('code-pane')
+  if (ta) ta.style.whiteSpace    = _wordWrap ? 'pre-wrap' : 'pre'
+  if (hl) hl.style.whiteSpace    = _wordWrap ? 'pre-wrap' : 'pre'
+  if (inner) inner.style.minWidth = _wordWrap ? '0' : ''
+  if (pane) pane.style.overflowX  = _wordWrap ? 'hidden' : 'auto'
+  tLine((_wordWrap ? 'Word wrap ON' : 'Word wrap OFF') + '  (Ctrl+Shift+W)', '#60a5fa')
+}
+
 function toggleComment() {
   const ta = $('#editor-ta'); if (!ta) return
   const {selectionStart:s,selectionEnd:en,value:v} = ta
@@ -1884,7 +2558,8 @@ function selectNext(ta) {
     let l=s,r=s
     while(l>0&&/\w/.test(v[l-1]))l--
     while(r<v.length&&/\w/.test(v[r]))r++
-    if(l<r)ta.setSelectionRange(l,r); return
+    if(l<r){ ta.setSelectionRange(l,r); return }
+    return
   }
   const next = v.indexOf(word,en)
   if (next!==-1) { ta.setSelectionRange(next,next+word.length); scrollToLine(ta,next) }
@@ -1985,6 +2660,17 @@ function runBuildStep(name) {
 
 function onZigDone(code) {
   setRunning(false)
+  // Parse GPA leak output from accumulated terminal output
+  const termEl = document.getElementById('term-out')
+  if (termEl) {
+    const termText = termEl.textContent || ''
+    const leaks = parseLeaks(termText)
+    if (leaks.length) {
+      applyDiags(leaks, 'GPA')
+      tLine('⚠ GPA detected ' + leaks.length + ' memory leak(s) — see Problems panel', '#fbbf24')
+      switchPanel('problems')
+    }
+  }
   const elapsed = _ts.t ? ` (${((Date.now()-_ts.t)/1000).toFixed(2)}s)` : ''
   tLine(code===0 ? `─── ✓ exit 0${elapsed} ───` : `─── ✕ exit ${code}${elapsed} ───`,
         code===0 ? '#4ade80' : '#f87171')
@@ -2435,7 +3121,10 @@ async function addTab(path, name, content, lang='text') {
   reRenderEditor()
 }
 
-function activateTab(id){ _lineCache.length=0; S.activeTab=id; reRenderEditor() }
+function activateTab(id){
+  _lineCache.length=0; S.activeTab=id; reRenderEditor()
+  setTimeout(() => updateBreadcrumb(), 0)
+}
 
 async function closeTab(id) {
   const tab=S.tabs.find(t=>t.id===id)
@@ -2783,6 +3472,38 @@ function onDrag(e) {
 }
 
 // ── Dialogs ───────────────────────────────────────────────────────────────────
+// Font size — Ctrl+= bigger, Ctrl+- smaller, Ctrl+0 reset
+let _fontSize = parseInt(localStorage.getItem('ferrum-fontsize') || '13', 10)
+function adjustFontSize(delta) {
+  if (delta === 0) {
+    _fontSize = 13
+  } else {
+    _fontSize = Math.max(10, Math.min(22, _fontSize + delta))
+  }
+  localStorage.setItem('ferrum-fontsize', _fontSize)
+  applyFontSize(_fontSize)
+}
+function applyFontSize(sz) {
+  const root = document.documentElement
+  root.style.setProperty('--fs-editor', sz + 'px')
+  root.style.setProperty('--lh', Math.round(sz * 1.7) + 'px')
+  // Resize textarea and gutter to match new line height
+  const tab = activeTab()
+  if (tab) { _lineCache.length = 0; redrawHL(); redrawGutter(); resizeTextarea(tab) }
+  // Show badge
+  let badge = document.getElementById('font-badge')
+  if (!badge) {
+    badge = document.createElement('div')
+    badge.id = 'font-badge'
+    badge.className = 'font-badge'
+    document.body.appendChild(badge)
+  }
+  badge.textContent = sz + 'px'
+  badge.classList.add('visible')
+  clearTimeout(badge._t)
+  badge._t = setTimeout(() => badge.classList.remove('visible'), 1200)
+}
+
 function closeAllDialogs(){
   $('#args-dlg')?.classList.add('hidden')
   $('#newitem-dlg')?.classList.add('hidden')
@@ -2798,7 +3519,10 @@ function reRenderEditor() {
   const lel=$('#sb-lang');if(lel)lel.textContent=lang==='zig'?'Zig':'Text'
   $('#tab-bar')?.replaceWith(buildTabBar())
   $('#editor-area')?.replaceWith(buildEditorArea())
-  setTimeout(()=>$('#editor-ta')?.focus(),20)
+  setTimeout(() => {
+    $('#editor-ta')?.focus()
+    updateBreadcrumb()
+  }, 20)
 }
 
 function reRenderSidebar(){ $('#tree-scroll')?.replaceWith(buildTreeView()) }
