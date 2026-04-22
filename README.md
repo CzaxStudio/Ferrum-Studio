@@ -27,6 +27,21 @@ Most editors treat Zig as an afterthought — a language server plugin bolted on
 
 ## Screenshots
 
+
+<img width="1365" height="720" alt="Capture15" src="https://github.com/user-attachments/assets/f03de5f3-9b9d-4e89-97bc-08eed8c97d17" />
+
+
+
+
+<img width="1366" height="726" alt="Capture9" src="https://github.com/user-attachments/assets/7b9e6da8-f31e-42fd-b17f-6923d5b12ba9" />
+
+
+
+
+<img width="1366" height="726" alt="Capture9" src="https://github.com/user-attachments/assets/e8e0eb18-2847-4fb0-99a4-6558f355b1f7" />
+
+
+
 > Open a Zig project → `F5` to run → see output instantly in the integrated terminal.
 
 ```
