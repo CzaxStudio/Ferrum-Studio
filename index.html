@@ -1,14 +1,458 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://api.x.ai https://fonts.googleapis.com https://fonts.gstatic.com;" />
-  <title>Ferrum Studio</title>
-  <!-- Google Fonts removed - using system fonts instead -->
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Ferrum Studio — Native IDE for Zig on Windows</title>
+  <!-- Google Fonts + basic reset -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700;14..32,800&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: #0a0c10;
+      font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+      color: #eef2ff;
+      line-height: 1.5;
+      scroll-behavior: smooth;
+    }
+
+    /* custom scrollbar */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #1e1f2c;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #4b5563;
+      border-radius: 8px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #6b7280;
+    }
+
+    .container {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+
+    /* header / nav */
+    .navbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      padding: 20px 0;
+      border-bottom: 1px solid #2d2f3e;
+    }
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 1.6rem;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+    }
+    .logo-symbol {
+      background: #f97316;
+      width: 32px;
+      height: 32px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 8px;
+      font-weight: 800;
+      color: #0a0c10;
+    }
+    .nav-links {
+      display: flex;
+      gap: 28px;
+      align-items: center;
+    }
+    .nav-links a {
+      color: #cbd5e6;
+      text-decoration: none;
+      font-weight: 500;
+      transition: 0.2s;
+    }
+    .nav-links a:hover {
+      color: #f97316;
+    }
+    .download-btn {
+      background: #f97316;
+      padding: 8px 20px;
+      border-radius: 40px;
+      color: white !important;
+      font-weight: 600;
+      box-shadow: 0 4px 10px rgba(249,115,22,0.2);
+    }
+    .download-btn:hover {
+      background: #fd8a3c;
+      transform: scale(0.97);
+    }
+
+    /* hero */
+    .hero {
+      padding: 60px 0 40px;
+      text-align: center;
+    }
+    .badge-row {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 24px;
+    }
+    .badge {
+      background: #1e1f2e;
+      padding: 6px 14px;
+      border-radius: 40px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      backdrop-filter: blur(4px);
+    }
+    .hero h1 {
+      font-size: 3.5rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, #ffffff, #f97316);
+      background-clip: text;
+      -webkit-background-clip: text;
+      color: transparent;
+      margin-bottom: 20px;
+    }
+    .hero p {
+      font-size: 1.25rem;
+      color: #b9c3db;
+      max-width: 720px;
+      margin: 0 auto 32px;
+    }
+    .cta-group {
+      display: flex;
+      gap: 16px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    .btn-primary {
+      background: #f97316;
+      border: none;
+      padding: 12px 32px;
+      font-weight: 600;
+      border-radius: 40px;
+      color: white;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: 0.2s;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .btn-secondary {
+      background: #2d2f3e;
+      border: 1px solid #4b5563;
+      padding: 12px 28px;
+      border-radius: 40px;
+      color: #e2e8f0;
+      font-weight: 500;
+      text-decoration: none;
+      transition: 0.2s;
+    }
+    .btn-secondary:hover {
+      background: #3b3f54;
+    }
+
+    /* terminal mock */
+    .terminal-mock {
+      background: #0f111a;
+      border-radius: 16px;
+      border: 1px solid #2a2c3c;
+      margin: 48px 0;
+      overflow: hidden;
+      box-shadow: 0 20px 35px -12px rgba(0,0,0,0.5);
+    }
+    .term-header {
+      background: #181c27;
+      padding: 12px 20px;
+      display: flex;
+      gap: 10px;
+      border-bottom: 1px solid #2a2c3c;
+    }
+    .term-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #ed6a5e;
+    }
+    .term-dot:nth-child(2) { background: #f5bd4f; }
+    .term-dot:nth-child(3) { background: #61c454; }
+    .term-body {
+      padding: 20px;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 0.85rem;
+      background: #0b0e16;
+      color: #cdd9f4;
+    }
+
+    /* features grid */
+    .section-title {
+      font-size: 2rem;
+      font-weight: 700;
+      margin: 48px 0 24px;
+      border-left: 4px solid #f97316;
+      padding-left: 20px;
+    }
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 24px;
+      margin: 32px 0;
+    }
+    .feature-card {
+      background: #11131f;
+      border-radius: 20px;
+      padding: 24px;
+      border: 1px solid #252837;
+      transition: all 0.2s;
+    }
+    .feature-card:hover {
+      border-color: #f97316;
+      transform: translateY(-3px);
+    }
+    .feature-icon {
+      font-size: 2rem;
+      margin-bottom: 12px;
+    }
+    .feature-card h3 {
+      font-size: 1.35rem;
+      margin-bottom: 12px;
+    }
+    .feature-card p, .feature-card li {
+      color: #a3b3d6;
+      font-size: 0.9rem;
+    }
+    .key-list {
+      list-style: none;
+      margin-top: 12px;
+    }
+    .key-list li {
+      margin-bottom: 6px;
+      display: flex;
+      gap: 10px;
+    }
+    kbd {
+      background: #1f2538;
+      padding: 2px 8px;
+      border-radius: 6px;
+      font-family: monospace;
+      font-weight: 600;
+      color: #facc15;
+    }
+
+    /* comparison table */
+    .compare-table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #0f111c;
+      border-radius: 20px;
+      overflow: hidden;
+      margin: 24px 0;
+    }
+    .compare-table th, .compare-table td {
+      padding: 14px 16px;
+      text-align: left;
+      border-bottom: 1px solid #252837;
+    }
+    .compare-table th {
+      background: #1a1d2b;
+      font-weight: 600;
+    }
+    .compare-table td:first-child {
+      font-weight: 500;
+    }
+    .check {
+      color: #4ade80;
+    }
+
+    /* download banner */
+    .win-banner {
+      background: linear-gradient(135deg, #1e293b, #0f172a);
+      border-radius: 32px;
+      padding: 40px 32px;
+      margin: 48px 0;
+      border: 1px solid #f9731666;
+      text-align: center;
+    }
+    .win-banner h2 {
+      font-size: 1.8rem;
+      margin-bottom: 12px;
+    }
+    .win-badge {
+      background: #0078d4;
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 30px;
+      font-size: 0.8rem;
+      margin-bottom: 20px;
+    }
+
+    footer {
+      border-top: 1px solid #252837;
+      padding: 40px 0 32px;
+      margin-top: 48px;
+      text-align: center;
+      color: #7e8aa8;
+    }
+    @media (max-width: 700px) {
+      .hero h1 { font-size: 2.3rem; }
+      .navbar { flex-direction: column; gap: 16px; }
+    }
+  </style>
 </head>
 <body>
-  <div id="app"></div>
-  <script type="module" src="/src/main.js"></script>
+<div class="container">
+  <!-- navigation -->
+  <div class="navbar">
+    <div class="logo">
+      <span class="logo-symbol">⬡</span> Ferrum Studio
+    </div>
+    <div class="nav-links">
+      <a href="#features">Features</a>
+      <a href="#shortcuts">Shortcuts</a>
+      <a href="#install">Download</a>
+      <a href="https://github.com/CzaxStudio/Ferrum-Studio" target="_blank">GitHub</a>
+      <a href="https://github.com/CzaxStudio/Ferrum-Studio/releases/download/Windows/ferrum.exe" class="download-btn">⬇ Windows .exe</a>
+    </div>
+  </div>
+
+  <!-- hero -->
+  <div class="hero">
+    <div class="badge-row">
+      <span class="badge">Built for Zig</span>
+      <span class="badge">Native Windows IDE</span>
+      <span class="badge">Zero Electron / ~12 MB</span>
+    </div>
+    <h1>Ferrum Studio<br><span style="font-size: 1.8rem;">The professional IDE exclusively for Zig</span></h1>
+    <p>Fast, native, and lightweight — starts in <strong>&lt;1 second</strong>, uses ~35 MB RAM. No Chromium, no bloat. Designed for Zig developers who value performance.</p>
+    <div class="cta-group">
+      <a href="https://github.com/CzaxStudio/Ferrum-Studio/releases/download/Windows/ferrum.exe" class="btn-primary">⬇ Download for Windows</a>
+      <a href="https://github.com/CzaxStudio/Ferrum-Studio" class="btn-secondary" target="_blank">View on GitHub</a>
+    </div>
+  </div>
+
+  <!-- terminal mockup as seen in README -->
+  <div class="terminal-mock">
+    <div class="term-header">
+      <div class="term-dot"></div><div class="term-dot"></div><div class="term-dot"></div>
+      <span style="margin-left: 12px; font-size: 0.75rem;">zig 0.14.0 — windows</span>
+    </div>
+    <div class="term-body">
+      <pre style="margin:0; font-family: inherit;">┌─────────────────────────────────────────────────────────────┐
+│ File  Edit  Run  Zig  View            zig 0.14.0  windows   │
+├──────┬──────────────────────────────────────────────────────┤
+│      │  main.zig  ×                                         │
+│      ├─ src / main.zig ──────────────────────────────────── │
+│      │  1  const std = @import("std");                      │
+│      │  2                                                   │
+│ src/ │  3  pub fn main() !void {                            │
+│  main│  4      const stdout = std.io.getStdOut().writer();  │
+│ build│  5      try stdout.print("Hello!\n", .{});           │
+│      │  6  }                                                │
+│      ├──────────────────────────────────────────────────────│
+│      │ Terminal      Problems   Tests   Build               │
+│      │ $ zig run src/main.zig                               │
+│      │ Hello!                                               │
+│      │ ─── ✓ exit 0 (0.31s) ───                             |
+└──────┴──────────────────────────────────────────────────────┘</pre>
+    </div>
+  </div>
+
+  <!-- Features section -->
+  <div id="features">
+    <div class="section-title"> Zig-first tooling</div>
+    <div class="features-grid">
+      <div class="feature-card"><div class="feature-icon"></div><h3>Smart editing</h3><p>Syntax highlighting, bracket auto-close, 120+ IntelliSense completions, 29 Zig snippets (fn, struct, gpa, al...). Ctrl+D multi-select, inline error ghost text.</p></div>
+      <div class="feature-card"><div class="feature-icon"></div><h3>Run & build instantly</h3><p>F5 → zig run, F7 → zig build, F8 → zig test. Interactive stdin & live output. Stop process with Ctrl+C. Build steps panel reads build.zig.</p></div>
+      <div class="feature-card"><div class="feature-icon"></div><h3>Human-readable errors</h3><p>Problems panel with plain‑English explanations and fix suggestions. Error squiggles, click-to-jump, auto-check after 2.5s idle.</p></div>
+      <div class="feature-card"><div class="feature-icon"></div><h3>Project templates</h3><p>5 starters: Executable (CLI), Library, TCP Server, Embedded (Cortex-M4), Comptime Metaprogramming. Auto‑creates files and opens main.zig.</p></div>
+      <div class="feature-card"><div class="feature-icon"></div><h3>Integrated terminal + Git</h3><p>Full ANSI terminal, command history, branch name, Git status (M/A/?) in file tree. Zig detection with registry & PATH scanning.</p></div>
+      <div class="feature-card"><div class="feature-icon"></div><h3>Native & responsive</h3><p>Built with Go + Wails, WebView2 (Windows). Font size shortcuts, word wrap toggle, multi‑tab, save before close, and ultra‑low memory.</p></div>
+    </div>
+  </div>
+
+  <!-- shortcuts & snippets teaser -->
+  <div id="shortcuts">
+    <div class="section-title"> Keyboard efficiency</div>
+    <div class="features-grid" style="grid-template-columns: repeat(auto-fit, minmax(240px,1fr));">
+      <div class="feature-card"><h3>Editor</h3><ul class="key-list"><li><kbd>Ctrl+S</kbd> Save & check</li><li><kbd>Ctrl+Shift+F</kbd> zig fmt</li><li><kbd>Ctrl+D</kbd> select next</li><li><kbd>Ctrl+P</kbd> quick open</li><li><kbd>Ctrl+G</kbd> go to line</li><li><kbd>Ctrl+/</kbd> toggle comment</li><li><kbd>Home</kbd> smart home</li></ul></div>
+      <div class="feature-card"><h3>Run / Zig</h3><ul class="key-list"><li><kbd>F5</kbd> Run file</li><li><kbd>F6</kbd> Run with args</li><li><kbd>F7</kbd> zig build</li><li><kbd>F8</kbd> zig test</li><li><kbd>Ctrl+Shift+C</kbd> ast-check</li><li><kbd>Ctrl+C</kbd> kill process</li></ul></div>
+      <div class="feature-card"><h3>Navigation</h3><ul class="key-list"><li><kbd>Ctrl+Tab</kbd> switch tabs</li><li><kbd>Ctrl+W</kbd> close tab</li><li><kbd>Escape</kbd> close dialogs</li><li><kbd>Ctrl+= / -</kbd> font size</li><li><kbd>Ctrl+Shift+W</kbd> word wrap</li></ul></div>
+    </div>
+    <div style="background:#11131f; border-radius: 20px; padding: 20px; margin: 24px 0;">
+      <h3 style="display: flex; gap: 12px; align-items:center;"> Popular Zig snippets <span style="font-size:0.8rem;">(type → Tab)</span></h3>
+      <div style="display: flex; flex-wrap: wrap; gap: 12px; margin-top: 16px;">
+        <span><kbd>fn</kbd> → function</span> <span><kbd>pfn</kbd> → pub fn</span> <span><kbd>main</kbd> → pub fn main</span> <span><kbd>gpa</kbd> → GPA allocator</span> <span><kbd>al</kbd> → ArrayList</span> <span><kbd>hm</kbd> → StringHashMap</span> <span><kbd>defer</kbd> / <kbd>errd</kbd></span> <span><kbd>struct</kbd> / <kbd>enum</kbd></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Comparison table -->
+  <div>
+    <div class="section-title"> Ferrum Studio vs. general editors</div>
+    <table class="compare-table">
+      <thead><tr><th>Feature</th><th>Ferrum Studio</th><th>VS Code + ZLS</th><th>Zed</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Purpose-built for Zig</td><td class="check">✓</td><td>Partial</td><td>Partial</td></tr>
+        <tr><td>Native (no Electron)</td><td class="check">✓</td><td>✗</td><td class="check">✓</td></tr>
+        <tr><td>Human-readable errors + fixes</td><td class="check">✓</td><td>✗</td><td>✗</td></tr>
+        <tr><td>Zig project templates</td><td class="check">✓</td><td>✗</td><td>✗</td></tr>
+        <tr><td>Auto Zig detection (registry/PATH)</td><td class="check">✓</td><td>Manual</td><td>Manual</td></tr>
+        <tr><td>RAM usage (idle)</td><td>~35 MB</td><td>~300 MB</td><td>~80 MB</td></tr>
+        <tr><td>Cold start time</td><td>&lt; 1 s</td><td>3–8 s</td><td>1–2 s</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Windows + download banner (main release) -->
+  <div id="install" class="win-banner">
+    <div class="win-badge"> Windows 10 / 11 • WebView2 ready</div>
+    <h2>Download Ferrum Studio for Windows</h2>
+    <p style="max-width: 600px; margin: 12px auto;">Single executable, ~12 MB. No installation required — just download and run. <br>Requires Zig 0.13+ (auto-detection finds your installation).</p>
+    <div style="margin-top: 24px; display: flex; gap: 20px; justify-content: center; flex-wrap: wrap;">
+      <a href="https://github.com/CzaxStudio/Ferrum-Studio/releases/download/Windows/ferrum.exe" class="btn-primary" style="background:#f97316; font-size:1.1rem;">ferrum.exe (latest)</a>
+      <a href="https://github.com/CzaxStudio/Ferrum-Studio" target="_blank" class="btn-secondary">GitHub repository & source</a>
+    </div>
+    <p style="margin-top: 20px; font-size:0.85rem;">Checksum & release notes on GitHub • Built with Go + Wails • MIT License</p>
+  </div>
+
+  <!-- extra: zig detection / info -->
+  <div style="display: flex; gap: 24px; flex-wrap: wrap; justify-content: space-between; margin: 32px 0;">
+    <div style="flex:1; background:#11131f; border-radius: 24px; padding: 20px;">
+      <h3>Smart Zig detection</h3>
+      <p style="margin-top: 12px;">PATH → Windows Registry (HKCU) → AppData\Local\zig → fixed paths → home directory scan. If not found, click Zig badge → browse or retry.</p>
+    </div>
+    <div style="flex:1; background:#11131f; border-radius: 24px; padding: 20px;">
+      <h3> Build from source</h3>
+      <p style="margin-top: 12px;">Requires Go 1.21+, Wails, Node.js. <br> <code style="background:#1e1f2c; padding:4px 10px; border-radius:12px;">git clone https://github.com/CzaxStudio/Ferrum-Studio && wails dev</code></p>
+    </div>
+  </div>
+
+  <!-- Thanks & footer -->
+  <footer>
+    <p style="display: flex; justify-content: center; gap: 20px; flex-wrap: wrap;">
+      <span>⬡ Ferrum Studio — “Ferrum” is Latin for iron, the strength of steel.</span>
+      <span><a href="https://ziglang.org" style="color:#f97316;" target="_blank">ziglang.org</a> · <a href="https://wails.io" style="color:#f97316;" target="_blank">wails.io</a></span>
+    </p>
+    <p style="margin-top: 20px;">Built with ♥ for the Zig community • Special thanks to Claude AI (assistance with JS) and Stack Overflow.</p>
+    <p style="margin-top: 12px; font-size: 0.8rem;">MIT License • © CzaxStudio 2026</p>
+  </footer>
+</div>
 </body>
 </html>
