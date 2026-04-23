@@ -326,6 +326,16 @@ Contributions are welcome. Areas where help is most valuable:
 - **Zig 0.14+ syntax** — keep the highlighter updated with new keywords
 - **macOS / Linux testing** — most development has been on Windows
 
+
+## AI Usage
+
+Parts of the frontend (JavaScript/UI) were developed with the help of AI tools (Claude) due to my limited experience with JS.
+
+The Go backend, Zig integration, and overall architecture were implemented manually.
+
+This project is also a learning process, and the codebase will be refined and cleaned up over time.
+
+
 ```bash
 # Run in dev mode with hot reload
 wails dev
