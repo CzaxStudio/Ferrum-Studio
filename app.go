@@ -1,5 +1,4 @@
 package main
-
 import (
 	"bufio"
 	"context"
@@ -71,22 +70,15 @@ func (a *App) startup(ctx context.Context) {
 	a.zigPath = locateZig()
 }
 
-// ── Zig discovery ─────────────────────────────────────────────────────────────
 
-// locateZig finds the zig executable using multiple strategies:
-// 1. Current PATH (exec.LookPath)
-// 2. Re-read the actual user PATH from registry/env file (catches post-install changes)
-// 3. Known installation directories on Windows/Linux/macOS
-// 4. Scan home directory for zig-* folders
+
 func locateZig() string {
-	// Strategy 1: standard PATH lookup
+	
 	if p, err := exec.LookPath("zig"); err == nil {
 		return p
 	}
 
-	// Strategy 2: read the actual current user PATH from the OS
-	// On Windows, the process inherits PATH from startup — new PATH entries
-	// added after the IDE was built won't be visible. Read it fresh.
+
 	if freshPath := getFreshPATH(); freshPath != "" {
 		for _, dir := range filepath.SplitList(freshPath) {
 			for _, name := range []string{"zig", "zig.exe"} {
@@ -100,7 +92,7 @@ func locateZig() string {
 
 	home, _ := os.UserHomeDir()
 
-	// Strategy 3: known fixed locations
+	
 	candidates := []string{
 		// Unix
 		"/usr/local/bin/zig",
@@ -111,7 +103,7 @@ func locateZig() string {
 		filepath.Join(home, "bin", "zig"),
 		filepath.Join(home, ".zig", "zig"),
 
-		// Windows — all common install paths
+		
 		`C:\zig\zig.exe`,
 		`C:\zig-windows-x86_64\zig.exe`,
 		`C:\Program Files\zig\zig.exe`,
@@ -121,7 +113,6 @@ func locateZig() string {
 		filepath.Join(home, ".zig", "zig.exe"),
 	}
 
-	// Windows AppData\Local (common for user-level installs)
 	if localAppData := os.Getenv("LOCALAPPDATA"); localAppData != "" {
 		candidates = append(candidates,
 			filepath.Join(localAppData, "zig", "zig.exe"),
@@ -137,8 +128,6 @@ func locateZig() string {
 			}
 		}
 	}
-
-	// Scan home dir for zig-* and zig_* folders (manual extracts)
 	for _, searchDir := range []string{home, filepath.Join(home, "Downloads"), filepath.Join(home, "dev"), `C:\`} {
 		if entries, err := os.ReadDir(searchDir); err == nil {
 			for _, e := range entries {
@@ -161,12 +150,11 @@ func locateZig() string {
 		}
 	}
 
-	// Last resort: return "zig" and hope it's on PATH when commands run
+	
 	return "zig"
 }
 
-// getFreshPATH reads the current user's PATH directly from the OS,
-// bypassing the inherited process environment which may be stale.
+
 func getFreshPATH() string {
 	switch goruntime.GOOS {
 	case "windows":
