@@ -118,7 +118,7 @@ func locateZig() string {
 			filepath.Join(localAppData, "zig", "zig.exe"),
 			filepath.Join(localAppData, "Programs", "zig", "zig.exe"),
 		)
-		// Scan for zig-windows-* directories in AppData\Local
+		
 		if entries, err := os.ReadDir(localAppData); err == nil {
 			for _, e := range entries {
 				if e.IsDir() && strings.HasPrefix(strings.ToLower(e.Name()), "zig") {
@@ -158,10 +158,10 @@ func locateZig() string {
 func getFreshPATH() string {
 	switch goruntime.GOOS {
 	case "windows":
-		// Read from Windows registry — the authoritative source of user PATH
+		
 		return getWindowsUserPATH()
 	case "linux":
-		// Source common shell profile files
+		
 		return getUnixShellPATH()
 	case "darwin":
 		return getUnixShellPATH()
@@ -170,15 +170,14 @@ func getFreshPATH() string {
 }
 
 func getWindowsUserPATH() string {
-	// Use reg.exe to read the user PATH from registry
-	// This works even if the IDE was launched before PATH was updated
+	
 	cmd := exec.Command("reg", "query",
 		`HKCU\Environment`,
 		"/v", "Path")
 	cmd.SysProcAttr = hiddenWindow()
 	out, err := cmd.Output()
 	if err != nil {
-		// Also try system PATH
+		
 		cmd2 := exec.Command("reg", "query",
 			`HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Environment`,
 			"/v", "Path")
@@ -189,15 +188,15 @@ func getWindowsUserPATH() string {
 		}
 		out = out2
 	}
-	// reg query output: "    Path    REG_SZ    C:\Windows\system32;..."
+	
 	lines := strings.Split(string(out), "\n")
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
 		if strings.HasPrefix(strings.ToUpper(line), "PATH") {
-			// Format: "Path    REG_SZ    <value>" or "Path    REG_EXPAND_SZ    <value>"
+			
 			parts := strings.Fields(line)
 			if len(parts) >= 3 {
-				// Expand environment variables in the path
+				
 				rawPath := strings.Join(parts[2:], " ")
 				return os.ExpandEnv(rawPath)
 			}
@@ -207,7 +206,7 @@ func getWindowsUserPATH() string {
 }
 
 func getUnixShellPATH() string {
-	// Run the user's shell with -l (login) to get the real PATH
+	
 	shell := os.Getenv("SHELL")
 	if shell == "" {
 		shell = "/bin/sh"
@@ -224,7 +223,7 @@ func augmentedEnv() []string {
 	env := os.Environ()
 	home, _ := os.UserHomeDir()
 
-	// Static extras — always appended
+	
 	extraDirs := []string{
 		"/usr/local/bin", "/opt/homebrew/bin",
 		"/home/linuxbrew/.linuxbrew/bin",
@@ -233,7 +232,7 @@ func augmentedEnv() []string {
 		filepath.Join(home, "bin"),
 	}
 
-	// Also add the fresh user PATH (catches post-install PATH changes on Windows)
+	
 	if fresh := getFreshPATH(); fresh != "" {
 		for _, dir := range filepath.SplitList(fresh) {
 			extraDirs = append(extraDirs, dir)
@@ -296,21 +295,13 @@ func (a *App) WriteFile(path, content string) string {
 	return ""
 }
 
-// SaveFileDialog is disabled on Windows due to a Wails v2.12 bug:
-// The native save dialog triggers WebView2.Focus() while open, which panics
-// with "The parameter is incorrect" in the Windows message loop.
-// The panic is on the OS message loop goroutine so recover() cannot catch it.
-//
-// Workaround: we return "" immediately and let the JS side handle Save As
-// via a simple text-input dialog (no native dialog). This is safe and stable.
+
 func (a *App) SaveFileDialog(name string) string {
-	// Return empty string — JS will show its own inline Save As prompt.
-	// This avoids the Wails v2.12 Windows WebView2 crash entirely.
+	
 	return ""
 }
 
-// SaveAs writes content to an explicit path provided by the caller.
-// Used by the JS "Save As" flow that bypasses the broken native dialog.
+
 func (a *App) SaveAs(path, content string) string {
 	if path == "" {
 		return "empty path"
@@ -391,26 +382,26 @@ func buildTree(path string, depth int) (FileNode, error) {
 	return node, nil
 }
 
-// ── Git integration ───────────────────────────────────────────────────────────
+
 
 func (a *App) GetGitStatus() GitStatus {
 	gs := GitStatus{}
 
-	// Check if git repo
+	
 	_, err := os.Stat(filepath.Join(a.projectRoot, ".git"))
 	if err != nil {
 		return gs
 	}
 	gs.HasGit = true
 
-	// Get branch
+	
 	cmd := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD")
 	cmd.Dir = a.projectRoot
 	if out, err := cmd.Output(); err == nil {
 		gs.Branch = strings.TrimSpace(string(out))
 	}
 
-	// Get status
+	
 	cmd = exec.Command("git", "status", "--porcelain")
 	cmd.Dir = a.projectRoot
 	out, err := cmd.Output()
@@ -547,7 +538,7 @@ func (a *App) RunZig(cmdline string) {
 		cmd.Env = augmentedEnv()
 		cmd.Dir = a.projectRoot
 
-		// Open pipes BEFORE Start() — order matters
+		
 		stdinPipe, stdinErr := cmd.StdinPipe()
 		stdout, _ := cmd.StdoutPipe()
 		stderr, _ := cmd.StderrPipe()
@@ -631,8 +622,7 @@ func (a *App) RunZig(cmdline string) {
 	}()
 }
 
-// SendInput writes a line of text to the running process's stdin.
-// Called when the user presses Enter in the terminal while a process is running.
+
 func (a *App) SendInput(text string) {
 	a.procMu.Lock()
 	pipe := a.procStdin
@@ -640,7 +630,7 @@ func (a *App) SendInput(text string) {
 	if pipe == nil {
 		return
 	}
-	// Write the text followed by a newline (as if user pressed Enter)
+	
 	_, _ = fmt.Fprintln(pipe, text)
 }
 
@@ -666,7 +656,7 @@ func (a *App) ZigFmt(path string) string {
 	return string(b)
 }
 
-// ── Build steps ───────────────────────────────────────────────────────────────
+
 
 func (a *App) GetBuildSteps() []BuildStep {
 	cmd := exec.Command(a.zigPath, "build", "--help")
@@ -775,13 +765,12 @@ func (a *App) GetPlatform() string    { return goruntime.GOOS + "/" + goruntime.
 func (a *App) GetProjectRoot() string { return a.projectRoot }
 func (a *App) GetZigPath() string     { return a.zigPath }
 
-// SetZigPath lets the user manually point to their zig executable.
-// Called from the frontend "Browse for zig" button.
+
 func (a *App) SetZigPath(p string) string {
 	if p == "" {
 		return "empty path"
 	}
-	// Verify it actually runs
+	
 	cmd := exec.Command(p, "version")
 	cmd.Env = augmentedEnv()
 	out, err := cmd.Output()
@@ -792,7 +781,7 @@ func (a *App) SetZigPath(p string) string {
 	return strings.TrimSpace(string(out))
 }
 
-// BrowseForZig opens a file picker so the user can locate zig.exe manually.
+
 func (a *App) BrowseForZig() string {
 	p, err := wails.OpenFileDialog(a.ctx, wails.OpenDialogOptions{
 		Title: "Find your Zig executable",
@@ -807,8 +796,7 @@ func (a *App) BrowseForZig() string {
 	return a.SetZigPath(p)
 }
 
-// RetryZigDetection re-runs locateZig — useful after the user installs zig
-// and wants the IDE to pick it up without restarting.
+
 func (a *App) RetryZigDetection() map[string]string {
 	a.zigPath = locateZig()
 	return a.GetZigInfo()
