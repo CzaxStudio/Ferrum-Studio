@@ -2,7 +2,7 @@ import './style.css'
 import { TEMPLATES, buildTemplateDialog, explainError, buildEnhancedProblemItem } from './enhancements.js'
 
 // ══════════════════════════════════════════════════════════════════════════════
-//  FERRUM STUDIO  —  The Zig IDE
+//  FERRUM STUDIO  —  The Nim IDE
 // ══════════════════════════════════════════════════════════════════════════════
 
 // ── Wails bridge ──────────────────────────────────────────────────────────────
@@ -14,95 +14,114 @@ async function go(method, ...args) {
 function wOn(ev, fn) { window?.runtime?.EventsOn?.(ev, fn) }
 
 // ── Demo stubs ────────────────────────────────────────────────────────────────
-const DEMO = `const std = @import("std");
+const DEMO = `## Welcome to Ferrum Studio — The Nim IDE
+## This is a demo file. Open a real project with File -> Open Folder.
 
-/// A basic demonstration file for Ferrum Studio.
-pub fn main() !void {
-    const stdout = std.io.getStdOut().writer();
-    try stdout.print("Hello from Ferrum Studio!\\n", .{});
+import std/strutils
+import std/sequtils
+import std/math
 
-    const nums = [_]i32{ 1, 2, 3, 4, 5 };
-    var sum: i32 = 0;
-    for (nums) |n| sum += n;
-    try stdout.print("Sum of 1..5 = {d}\\n", .{sum});
+# A basic demonstration of Nim syntax
 
-    // Uncomment to see error diagnostics:
-    // const bad: u32 = "not a number";
-}
+type
+  Shape = object
+    name*: string
+    sides*: int
 
-test "addition is commutative" {
-    try std.testing.expect(1 + 2 == 2 + 1);
-}
+proc area*(s: Shape, sideLen: float): float =
+  ## Calculate area of a regular polygon.
+  let n = s.sides.float
+  (n * sideLen * sideLen) / (4.0 * tan(PI / n))
 
-test "subtraction works" {
-    try std.testing.expectEqual(@as(i32, 3), 5 - 2);
-}
+proc greet*(name: string): string =
+  "Hello, " & name & "! Welcome to Ferrum Studio."
 
-fn factorial(n: u64) u64 {
-    return if (n <= 1) 1 else n * factorial(n - 1);
-}
+when isMainModule:
+  echo greet("Nim Developer")
+
+  let shapes = @[
+    Shape(name: "Triangle", sides: 3),
+    Shape(name: "Square",   sides: 4),
+    Shape(name: "Hexagon",  sides: 6),
+  ]
+
+  for s in shapes:
+    let a = s.area(5.0)
+    echo s.name & " area: " & $a.round(2)
+
+  # Nim sequence operations
+  let nums = @[1, 2, 3, 4, 5]
+  let doubled = nums.map(proc(x: int): int = x * 2)
+  echo "Doubled: " & $doubled
 `
 
 const STUBS = {
-  OpenFolder:      async () => '',
-  OpenFile:        async () => null,
-  ReadFile:        async () => DEMO,
-  WriteFile:       async () => '',
-  SaveFileDialog:  async n => '',   // disabled on Windows — use SaveAs instead
-  SaveAs:          async (path, content) => { return '' },
-  GetFileTree:     async () => ({ name:'ferrum-demo', path:'/demo', isDir:true, ext:'', children:[
+  OpenFolder:        async () => '',
+  OpenFile:          async () => null,
+  ReadFile:          async () => DEMO,
+  WriteFile:         async () => '',
+  SaveFileDialog:    async () => '',
+  SaveAs:            async () => '',
+  GetFileTree:       async () => ({ name:'ferrum-demo', path:'/demo', isDir:true, ext:'', children:[
     { name:'src', path:'/demo/src', isDir:true, ext:'', children:[
-      { name:'main.zig',  path:'/demo/src/main.zig',  isDir:false, ext:'zig' },
-      { name:'utils.zig', path:'/demo/src/utils.zig', isDir:false, ext:'zig' },
+      { name:'main.nim',   path:'/demo/src/main.nim',   isDir:false, ext:'nim' },
+      { name:'utils.nim',  path:'/demo/src/utils.nim',  isDir:false, ext:'nim' },
     ]},
-    { name:'build.zig',     path:'/demo/build.zig',     isDir:false, ext:'zig' },
-    { name:'build.zig.zon', path:'/demo/build.zig.zon', isDir:false, ext:'zon' },
-    { name:'README.md',     path:'/demo/README.md',     isDir:false, ext:'md'  },
+    { name:'myapp.nimble', path:'/demo/myapp.nimble', isDir:false, ext:'nimble' },
+    { name:'config.nims',  path:'/demo/config.nims',  isDir:false, ext:'nims'   },
+    { name:'README.md',    path:'/demo/README.md',    isDir:false, ext:'md'     },
   ]}),
-  RunZig:          async cmd => { tPrint(`\x1b[2m[preview] zig ${cmd}\x1b[0m\n`); setTimeout(()=>onZigDone(0),400) },
-  ZigCheck:        async () => [],
-  ZigFmt:          async () => DEMO,
-  KillProc:        async () => {},
-  GetBuildSteps:   async () => ([
-    { name:'install', desc:'Build and install', kind:'install' },
-    { name:'run',     desc:'Run the app',       kind:'run'     },
-    { name:'test',    desc:'Run tests',         kind:'test'    },
+  // Nim-specific methods
+  RunNim:            async cmd => { tPrint('\x1b[2m[demo] nim ' + cmd + '\x1b[0m\n'); setTimeout(()=>onNimDone(0), 400) },
+  NimCheck:          async () => [],
+  NimFmt:            async () => DEMO,
+  NimVersion:        async () => '2.0.0',
+  GetNimInfo:        async () => ({ version:'2.0.0', path:'/usr/local/bin/nim', os:'linux', arch:'amd64' }),
+  GetNimPath:        async () => '/usr/local/bin/nim',
+  SetNimPath:        async () => 'stub',
+  BrowseForNim:      async () => '',
+  RetryNimDetection: async () => ({ version:'2.0.0', path:'nim', os:'linux', arch:'amd64' }),
+  // General
+  KillProc:          async () => {},
+  SendInput:         async () => {},
+  GetBuildSteps:     async () => ([
+    { name:'build',   desc:'nim c -d:release src/main.nim', kind:'install' },
+    { name:'run',     desc:'nim r src/main.nim',            kind:'run'     },
+    { name:'test',    desc:'nimble test',                   kind:'test'    },
   ]),
-  GetGitStatus:    async () => ({ hasGit:false, branch:'main', modified:[], added:[], untracked:[], deleted:[] }),
-  ScaffoldProject: async () => 'Scaffolded!',
-  ZigVersion:      async () => '0.13.0',
-  GetZigInfo:      async () => ({ version:'0.13.0', path:'/usr/local/bin/zig', os:'linux', arch:'amd64' }),
-  GetPlatform:     async () => 'linux/amd64',
-  GetProjectRoot:  async () => '',
-  GetZigPath:      async () => '/usr/local/bin/zig',
-  CreateFile:      async () => '',
-  CreateDir:       async () => '',
-  DeletePath:      async () => '',
+  GetGitStatus:      async () => ({ hasGit:false, branch:'main', modified:[], added:[], untracked:[], deleted:[] }),
+  ScaffoldProject:   async () => 'Scaffolded!',
+  GetPlatform:       async () => 'linux/amd64',
+  GetProjectRoot:    async () => '',
+  CreateFile:        async () => '',
+  CreateDir:         async () => '',
+  DeletePath:        async () => '',
   RenamePath:        async () => '',
-  SendInput:         async (text) => {},
-  SetZigPath:        async (p) => 'stub',
-  BrowseForZig:      async () => '',
-  RetryZigDetection: async () => ({ version:'0.13.0', path:'zig', os:'windows', arch:'amd64' }),
 }
 
 // ── Syntax highlighter ────────────────────────────────────────────────────────
 const ZIG_KW = new Set([
-  'addrspace','align','allowzero','and','anyframe','anytype','asm','async','await',
-  'break','callconv','catch','comptime','const','continue','defer','else','enum',
-  'errdefer','error','export','extern','fn','for','if','inline','linksection',
-  'noalias','noinline','nosuspend','opaque','or','orelse','packed','pub','resume',
-  'return','struct','suspend','switch','test','threadlocal','try','union',
-  'unreachable','usingnamespace','var','volatile','while',
+  // Nim keywords
+  'addr','and','as','asm','bind','block','break','case','cast','concept',
+  'const','continue','converter','defer','discard','distinct','div','do',
+  'elif','else','end','enum','except','export','finally','for','from',
+  'func','if','import','in','include','interface','is','isnot','iterator',
+  'let','macro','method','mixin','mod','nil','not','notin','object','of',
+  'or','out','proc','ptr','raise','ref','return','shl','shr','static',
+  'template','try','tuple','type','using','var','when','while','xor','yield',
 ])
 const ZIG_TY = new Set([
-  'bool','void','noreturn','type','anyerror','comptime_int','comptime_float',
-  'i8','i16','i32','i64','i128','i256','isize',
-  'u8','u16','u32','u64','u128','u256','usize',
-  'f16','f32','f64','f80','f128',
-  'c_char','c_short','c_ushort','c_int','c_uint','c_long','c_ulong',
-  'c_longlong','c_ulonglong','c_longdouble',
-  'true','false','undefined','null','std',
+  // Nim built-in types
+  'int','int8','int16','int32','int64','uint','uint8','uint16','uint32',
+  'uint64','float','float32','float64','bool','char','string','byte',
+  'Natural','Positive','BiggestInt','BiggestFloat','cint','clong','culong',
+  'cstring','pointer','void','auto','any','untyped','typed',
+  'varargs','openArray','seq','array','set','range','Slice',
+  'true','false','nil',
 ])
+
+const NIM_KW = ZIG_KW  // alias
+const NIM_TY = ZIG_TY  // alias
 
 // Bracket pair colors (per nesting depth 0–4 then cycles)
 const BR_COLORS = ['#f97316','#60a5fa','#4ade80','#c084fc','#fbbf24']
@@ -117,23 +136,37 @@ function hlCode(code) {
   }).join('')
 }
 
+// Hoisted constants — allocated once, not on every hlLine call
+const _brOpen  = new Set(['(','[','{'])
+const _brClose = new Set([')',']','}'])
+const _opRx    = /[+\-*%=<>!&|^~?:;,.]/
+// Escape HTML without regex allocation per call
+function _esc(s) {
+  let o = ''
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i]
+    if (c === '&') o += '&amp;'
+    else if (c === '<') o += '&lt;'
+    else if (c === '>') o += '&gt;'
+    else o += c
+  }
+  return o
+}
+
 function hlLine(raw, depthIn) {
   let out = '', i = 0, n = raw.length
   let depth = depthIn
-  const X = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-  const tok = (cls, val) => { out += `<span class="${cls}">${X(val)}</span>` }
-  const brOpen  = new Set(['(','[','{'])
-  const brClose = new Set([')',']','}'])
+  const tok = (cls, val) => { out += '<span class="' + cls + '">' + _esc(val) + '</span>' }
 
   while (i < n) {
     const c = raw[i]
 
-    // Doc comment ///
-    if (c==='/'&&raw[i+1]==='/'&&raw[i+2]==='/') {
+    // Nim doc comment ##
+    if (c==='#'&&raw[i+1]==='#') {
       tok('hdc', raw.slice(i)); break
     }
-    // Line comment //
-    if (c==='/'&&raw[i+1]==='/') {
+    // Nim line comment #
+    if (c==='#') {
       tok('hc', raw.slice(i)); break
     }
     // String "..."
@@ -148,16 +181,11 @@ function hlLine(raw, depthIn) {
       while(j<n){ if(raw[j]==="'"&&raw[j-1]!=='\\'){j++;break}; j++ }
       tok('hs', raw.slice(i,j)); i=j; continue
     }
-    // Multiline string \\
-    if (c==='\\'&&raw[i+1]==='\\') { tok('hs', raw.slice(i)); break }
-    // @builtins
+    // Nim triple-quoted string (starts with """ on previous line, we just highlight rest)
+    // Raw strings: r"..." — handled by the normal string case below
+    // Nim @ operator (seq constructor, address-of) — treat as operator
     if (c==='@') {
-      if (raw[i+1]==='"') {
-        let j=i+2; while(j<n&&raw[j]!=='"')j++
-        tok('hb', raw.slice(i,j+1)); i=j+1; continue
-      }
-      const m=raw.slice(i).match(/^@[a-zA-Z_]\w*/)
-      if(m){ tok('hb',m[0]); i+=m[0].length; continue }
+      tok('hop', c); i++; continue
     }
     // Numbers
     if (c>='0'&&c<='9') {
@@ -166,7 +194,7 @@ function hlLine(raw, depthIn) {
     }
     // Words
     if ((c>='a'&&c<='z')||(c>='A'&&c<='Z')||c==='_') {
-      let j=i+1; while(j<n&&/\w/.test(raw[j]))j++
+      let j=i+1; while(j<n){const _wc=raw.charCodeAt(j);if((_wc>=97&&_wc<=122)||(_wc>=65&&_wc<=90)||(_wc>=48&&_wc<=57)||_wc===95)j++;else break}
       const w=raw.slice(i,j), next=raw[j]
       if      (ZIG_KW.has(w)) tok('hk',w)
       else if (ZIG_TY.has(w)) tok('ht',w)
@@ -176,15 +204,15 @@ function hlLine(raw, depthIn) {
       i=j; continue
     }
     // Bracket pair colorization
-    if (brOpen.has(c)) {
+    if (_brOpen.has(c)) {
       const col = BR_COLORS[depth % BR_COLORS.length]
-      out += `<span class="hbr" style="color:${col}">${X(c)}</span>`
+      out += '<span class="hbr" style="color:' + col + '">' + _esc(c) + '</span>'
       depth++; i++; continue
     }
-    if (brClose.has(c)) {
+    if (_brClose.has(c)) {
       depth = Math.max(0, depth-1)
       const col = BR_COLORS[depth % BR_COLORS.length]
-      out += `<span class="hbr" style="color:${col}">${X(c)}</span>`
+      out += '<span class="hbr" style="color:' + col + '">' + _esc(c) + '</span>'
       i++; continue
     }
     // Operators & punctuation
@@ -195,40 +223,40 @@ function hlLine(raw, depthIn) {
   return [out || ' ', depth]
 }
 
-// ── Zig snippets ──────────────────────────────────────────────────────────────
+// ── Nim snippets ──────────────────────────────────────────────────────────────
 const SNIPPETS = [
-  // [trigger, display, body]  $0 = cursor  $1,$2 = tab stops (simplified)
-  ['fn',        'fn name(args) Type {}',      'fn $1($2) $3 {\n    $0\n}'],
-  ['pfn',       'pub fn name(args) Type {}',  'pub fn $1($2) $3 {\n    $0\n}'],
-  ['main',      'pub fn main() !void {}',      'pub fn main() !void {\n    $0\n}'],
-  ['struct',    'const X = struct {}',         'const $1 = struct {\n    $0\n};'],
-  ['enum',      'const X = enum {}',           'const $1 = enum {\n    $0\n};'],
-  ['union',     'const X = union(enum) {}',    'const $1 = union(enum) {\n    $0\n};'],
-  ['test',      'test "name" {}',              'test "$1" {\n    $0\n}'],
-  ['if',        'if (cond) {}',                'if ($1) {\n    $0\n}'],
-  ['ife',       'if (cond) {} else {}',        'if ($1) {\n    $0\n} else {\n    \n}'],
-  ['for',       'for (iter) |it| {}',          'for ($1) |$2| {\n    $0\n}'],
-  ['while',     'while (cond) {}',             'while ($1) {\n    $0\n}'],
-  ['whi',       'while (cond) : (inc) {}',     'while ($1) : ($2) {\n    $0\n}'],
-  ['sw',        'switch (val) { else => {} }', 'switch ($1) {\n    $2 => $3,\n    else => $0,\n}'],
-  ['defer',     'defer stmt;',                 'defer $0;'],
-  ['errd',      'errdefer stmt;',              'errdefer $0;'],
-  ['std',       'const std = @import("std");', 'const std = @import("std");$0'],
-  ['imp',       '@import("name")',             '@import("$1")$0'],
-  ['print',     'std.debug.print(...)',        'std.debug.print("$1\\n", .{$2});$0'],
-  ['wprint',    'writer.print(...)',           'try writer.print("$1\\n", .{$2});$0'],
-  ['alloc',     'page_allocator',              'const allocator = std.heap.page_allocator;\n$0'],
-  ['gpa',       'GeneralPurposeAllocator',     'var gpa = std.heap.GeneralPurposeAllocator(.{}){};\ndefer _ = gpa.deinit();\nconst allocator = gpa.allocator();\n$0'],
-  ['al',        'ArrayList(T)',                'var $1 = std.ArrayList($2).init(allocator);\ndefer $1.deinit();\n$0'],
-  ['hm',        'StringHashMap(T)',            'var $1 = std.StringHashMap($2).init(allocator);\ndefer $1.deinit();\n$0'],
-  ['try',       'try expr',                   'try $0'],
-  ['catch',     'catch |err| {}',             'catch |err| {\n    $0\n}'],
-  ['orelse',    'orelse expr',                'orelse $0'],
-  ['comp',      'comptime {}',                'comptime {\n    $0\n}'],
-  ['expect',    'std.testing.expect(...)',     'try std.testing.expect($0);'],
-  ['expeq',     'std.testing.expectEqual(...)', 'try std.testing.expectEqual($1, $0);'],
+  // [trigger, display, body]  $0 = cursor  $1,$2 = tab stops
+  ['proc',   'proc name(args): ReturnType',   'proc $1($2): $3 =\n  $0'],
+  ['func',   'func name(args): ReturnType',   'func $1($2): $3 =\n  $0'],
+  ['main',   'proc main() + call',            'proc main() =\n  $0\n\nmain()'],
+  ['type',   'type block',                    'type\n  $1 = object\n    $0'],
+  ['obj',    'object type',                   'type\n  $1* = object\n    $0: int'],
+  ['ref',    'ref object type',               'type\n  $1* = ref object\n    $0: int'],
+  ['enum',   'enum type',                     'type\n  $1 = enum\n    $0'],
+  ['tup',    'tuple type',                    'type\n  $1 = tuple\n    x: int\n    y: int\n$0'],
+  ['if',     'if statement',                  'if $1:\n  $0'],
+  ['ife',    'if/else statement',             'if $1:\n  $0\nelse:\n  discard'],
+  ['elif',   'if/elif/else',                  'if $1:\n  $0\nelif $2:\n  discard\nelse:\n  discard'],
+  ['for',    'for loop',                      'for $1 in $2:\n  $0'],
+  ['fori',   'for loop with index',           'for i, $1 in pairs($2):\n  $0'],
+  ['while',  'while loop',                    'while $1:\n  $0'],
+  ['case',   'case statement',                'case $1:\nof $2:\n  $0\nelse:\n  discard'],
+  ['try',    'try/except',                    'try:\n  $0\nexcept $1 as e:\n  echo e.msg'],
+  ['tmpl',   'template definition',           'template $1($2: typed): untyped =\n  $0'],
+  ['mac',    'macro definition',              'macro $1($2: untyped): untyped =\n  result = $0'],
+  ['iter',   'iterator definition',           'iterator $1($2): $3 =\n  yield $0'],
+  ['test',   'unittest block',                'suite "$1":\n  test "$2":\n    check $0'],
+  ['imp',    'import statement',              'import $0'],
+  ['inc',    'include statement',             'include $0'],
+  ['echo',   'echo statement',               'echo $0'],
+  ['fmt',    'fmt string',                    'fmt"$0"'],
+  ['seq',    'seq variable',                  'var $1: seq[$2] = @[$0]'],
+  ['tbl',    'Table init',                    'var $1 = initTable[string, $2]()\n$0'],
+  ['new',    'new ref object',                'let $1 = new($2)\n$0'],
+  ['assert', 'assert statement',              'assert $0, "$1"'],
+  ['doc',    'doc comment',                   '## $0'],
+  ['discard','discard statement',             'discard $0'],
 ]
-
 function trySnippet(ta) {
   const { selectionStart: pos, value: v } = ta
   const lineStart = v.lastIndexOf('\n', pos-1)+1
@@ -253,135 +281,122 @@ function trySnippet(ta) {
 
 // ── Autocomplete ──────────────────────────────────────────────────────────────
 // Pattern-based completions — no LSP needed
-// ── IntelliSense completion database ─────────────────────────────────────────
+// ── IntelliSense completion database — Nim stdlib ────────────────────────────
 // dot-chain aware: items with '.' only appear after typing that prefix
 const COMPLETE_ITEMS = [
-  // ── std top-level ──────────────────────────────────────────────────────────
-  { label:'std',                  detail:'The Zig standard library',                      kind:'module' },
-  // ── std sub-modules ────────────────────────────────────────────────────────
-  { label:'std.io',               detail:'I/O — getStdOut(), getStdIn(), Reader, Writer', kind:'module' },
-  { label:'std.fs',               detail:'Filesystem — openFile(), Dir, File',            kind:'module' },
-  { label:'std.mem',              detail:'Memory — Allocator, alloc(), free(), eql()',    kind:'module' },
-  { label:'std.fmt',              detail:'Format — allocPrint(), bufPrint(), parseInt()', kind:'module' },
-  { label:'std.math',             detail:'Math — sqrt(), sin(), cos(), abs(), max()',     kind:'module' },
-  { label:'std.testing',          detail:'Testing — expect(), expectEqual()',             kind:'module' },
-  { label:'std.debug',            detail:'Debug — print(), assert(), panic()',            kind:'module' },
-  { label:'std.time',             detail:'Time — milliTimestamp(), sleep(), Timer',       kind:'module' },
-  { label:'std.process',          detail:'Process — argsAlloc(), exit(), getEnvMap()',    kind:'module' },
-  { label:'std.sort',             detail:'Sort — sort(), asc(), desc()',                  kind:'module' },
-  { label:'std.unicode',          detail:'Unicode — Utf8View, utf8Encode()',              kind:'module' },
-  { label:'std.json',             detail:'JSON — parse(), stringify(), Value',            kind:'module' },
-  { label:'std.crypto',           detail:'Crypto — random, hash, sha2, aes',             kind:'module' },
-  { label:'std.net',              detail:'Network — tcpConnectToHost(), Address, Stream', kind:'module' },
-  { label:'std.compress',         detail:'Compression — gzip, zlib, deflate',            kind:'module' },
-  { label:'std.base64',           detail:'Base64 — standard encoder/decoder',            kind:'module' },
-  { label:'std.ascii',            detail:'ASCII — isAlpha(), isDigit(), toLower()',       kind:'module' },
-  // ── std.heap ───────────────────────────────────────────────────────────────
-  { label:'std.heap',                          detail:'Allocators namespace',             kind:'module' },
-  { label:'std.heap.page_allocator',           detail:'Simple page allocator (no free tracking)', kind:'field' },
-  { label:'std.heap.GeneralPurposeAllocator',  detail:'.init() → detects leaks in Debug mode', kind:'type' },
-  { label:'std.heap.ArenaAllocator',           detail:'.init(child) → free all at once',  kind:'type' },
-  { label:'std.heap.FixedBufferAllocator',     detail:'.init(buf) → stack-backed allocator', kind:'type' },
-  // ── std.io methods ─────────────────────────────────────────────────────────
-  { label:'std.io.getStdOut',     detail:'() std.fs.File.Writer',          kind:'fn' },
-  { label:'std.io.getStdIn',      detail:'() std.fs.File.Reader',          kind:'fn' },
-  { label:'std.io.getStdErr',     detail:'() std.fs.File.Writer',          kind:'fn' },
-  // ── std.mem methods ────────────────────────────────────────────────────────
-  { label:'std.mem.eql',          detail:'(T, a: []T, b: []T) bool',       kind:'fn' },
-  { label:'std.mem.startsWith',   detail:'(T, haystack, needle) bool',     kind:'fn' },
-  { label:'std.mem.endsWith',     detail:'(T, haystack, needle) bool',     kind:'fn' },
-  { label:'std.mem.indexOf',      detail:'(T, haystack, needle) ?usize',   kind:'fn' },
-  { label:'std.mem.split',        detail:'(T, buf, delim) SplitIterator',  kind:'fn' },
-  { label:'std.mem.trim',         detail:'(T, slice, values) []T',         kind:'fn' },
-  { label:'std.mem.copy',         detail:'(T, dest, src) void',            kind:'fn' },
-  { label:'std.mem.zeroes',       detail:'(T) T  — zero-init any type',    kind:'fn' },
-  { label:'std.mem.bytesAsSlice', detail:'(T, bytes) []T',                 kind:'fn' },
-  // ── std.fmt methods ────────────────────────────────────────────────────────
-  { label:'std.fmt.allocPrint',   detail:'(alloc, fmt, args) ![]u8',       kind:'fn' },
-  { label:'std.fmt.bufPrint',     detail:'(buf, fmt, args) ![]u8',         kind:'fn' },
-  { label:'std.fmt.parseInt',     detail:'(T, str, base) !T',              kind:'fn' },
-  { label:'std.fmt.parseFloat',   detail:'(T, str) !T',                    kind:'fn' },
-  { label:'std.fmt.format',       detail:'(writer, fmt, args) !void',      kind:'fn' },
-  // ── std.testing ────────────────────────────────────────────────────────────
-  { label:'std.testing.expect',         detail:'(ok: bool) !void',                  kind:'fn' },
-  { label:'std.testing.expectEqual',    detail:'(expected, actual) !void',          kind:'fn' },
-  { label:'std.testing.expectError',    detail:'(err, expr) !void',                 kind:'fn' },
-  { label:'std.testing.expectEqualSlices', detail:'(T, exp, act) !void',            kind:'fn' },
-  { label:'std.testing.expectEqualStrings', detail:'(exp, act) !void',              kind:'fn' },
-  { label:'std.testing.allocator',      detail:'std.mem.Allocator — test allocator', kind:'field' },
-  // ── std.debug ──────────────────────────────────────────────────────────────
-  { label:'std.debug.print',      detail:'(fmt, args) void',               kind:'fn' },
-  { label:'std.debug.assert',     detail:'(ok: bool) void',                kind:'fn' },
-  { label:'std.debug.panic',      detail:'(fmt, args) noreturn',           kind:'fn' },
-  // ── std.math ───────────────────────────────────────────────────────────────
-  { label:'std.math.sqrt',        detail:'(x: f64) f64',                   kind:'fn' },
-  { label:'std.math.abs',         detail:'(x: T) T',                       kind:'fn' },
-  { label:'std.math.max',         detail:'(a: T, b: T) T',                 kind:'fn' },
-  { label:'std.math.min',         detail:'(a: T, b: T) T',                 kind:'fn' },
-  { label:'std.math.maxInt',      detail:'(T) comptime_int',               kind:'fn' },
-  { label:'std.math.minInt',      detail:'(T) comptime_int',               kind:'fn' },
-  { label:'std.math.inf',         detail:'comptime_float — positive infinity', kind:'field' },
-  { label:'std.math.nan',         detail:'comptime_float — NaN',           kind:'field' },
-  { label:'std.math.pi',          detail:'3.14159... comptime_float',      kind:'field' },
-  // ── std collections ────────────────────────────────────────────────────────
-  { label:'std.ArrayList',        detail:'(T) — dynamic array; .init(alloc)', kind:'type' },
-  { label:'std.ArrayListUnmanaged', detail:'(T) — ArrayList without stored allocator', kind:'type' },
-  { label:'std.HashMap',          detail:'(K,V,ctx,maxLoad) — hash map',   kind:'type' },
-  { label:'std.StringHashMap',    detail:'(V) — string-keyed hash map',    kind:'type' },
-  { label:'std.AutoHashMap',      detail:'(K,V) — auto-hashed keys',       kind:'type' },
-  { label:'std.BufMap',           detail:'string→string map, owns values', kind:'type' },
-  { label:'std.PriorityQueue',    detail:'(T,ctx,cmp) — min/max heap',     kind:'type' },
-  // ── @builtins ──────────────────────────────────────────────────────────────
-  { label:'@import',         detail:'(path: []const u8) type',             kind:'builtin' },
-  { label:'@TypeOf',         detail:'(expr) type  — comptime type of expr',kind:'builtin' },
-  { label:'@sizeOf',         detail:'(T) comptime_int  — bytes',           kind:'builtin' },
-  { label:'@bitSizeOf',      detail:'(T) comptime_int  — bits',            kind:'builtin' },
-  { label:'@alignOf',        detail:'(T) comptime_int  — alignment',       kind:'builtin' },
-  { label:'@offsetOf',       detail:'(T, field) comptime_int',             kind:'builtin' },
-  { label:'@intCast',        detail:'(x) T  — asserts no truncation',      kind:'builtin' },
-  { label:'@floatCast',      detail:'(x) T  — narrowing float cast',       kind:'builtin' },
-  { label:'@ptrCast',        detail:'(ptr) *T  — reinterpret pointer',     kind:'builtin' },
-  { label:'@as',             detail:'(T, x) T  — type coercion',           kind:'builtin' },
-  { label:'@truncate',       detail:'(x) T  — truncate integer',           kind:'builtin' },
-  { label:'@intFromFloat',   detail:'(x) T  — float→int',                  kind:'builtin' },
-  { label:'@floatFromInt',   detail:'(x) T  — int→float',                  kind:'builtin' },
-  { label:'@intFromEnum',    detail:'(e) T  — enum→int',                   kind:'builtin' },
-  { label:'@enumFromInt',    detail:'(n) T  — int→enum',                   kind:'builtin' },
-  { label:'@intFromBool',    detail:'(b) u1  — bool→int',                  kind:'builtin' },
-  { label:'@intFromPtr',     detail:'(p) usize  — pointer→int',            kind:'builtin' },
-  { label:'@ptrFromInt',     detail:'(n) *T  — int→pointer',               kind:'builtin' },
-  { label:'@fieldParentPtr', detail:'(field_ptr) *Parent  — field offset', kind:'builtin' },
-  { label:'@panic',          detail:'(msg: []const u8) noreturn',           kind:'builtin' },
-  { label:'@compileError',   detail:'(msg: []const u8)  — CT error',       kind:'builtin' },
-  { label:'@compileLog',     detail:'(val)  — print at compile time',      kind:'builtin' },
-  { label:'@embedFile',      detail:'(path) []const u8  — embed at CT',    kind:'builtin' },
-  { label:'@hasField',       detail:'(T, name) bool  — CT field check',    kind:'builtin' },
-  { label:'@hasDecl',        detail:'(T, name) bool  — CT decl check',     kind:'builtin' },
-  { label:'@field',          detail:'(obj, name) T  — runtime field by name', kind:'builtin' },
-  { label:'@tagName',        detail:'(enum_val) []const u8  — enum→str',   kind:'builtin' },
-  { label:'@typeName',       detail:'(T) []const u8  — type→str at CT',    kind:'builtin' },
-  { label:'@typeInfo',       detail:'(T) std.builtin.Type  — reflect type',kind:'builtin' },
-  { label:'@Vector',         detail:'(len, T) SIMD vector type',           kind:'builtin' },
-  { label:'@memcpy',         detail:'(dest, src) void  — copy memory',     kind:'builtin' },
-  { label:'@memset',         detail:'(buf, val) void  — fill memory',      kind:'builtin' },
-  { label:'@min',            detail:'(a, b) T  — comptime min',            kind:'builtin' },
-  { label:'@max',            detail:'(a, b) T  — comptime max',            kind:'builtin' },
-  { label:'@abs',            detail:'(x) T  — absolute value',             kind:'builtin' },
-  { label:'@sqrt',           detail:'(x) T  — square root',                kind:'builtin' },
-  { label:'@sin',            detail:'(x) T  — sine',                       kind:'builtin' },
-  { label:'@cos',            detail:'(x) T  — cosine',                     kind:'builtin' },
-  { label:'@log',            detail:'(x) T  — natural log',                kind:'builtin' },
-  { label:'@exp',            detail:'(x) T  — e^x',                        kind:'builtin' },
-  { label:'@call',           detail:'(modifier, fn, args)',                 kind:'builtin' },
-  { label:'@frame',          detail:'() anyframe  — current async frame',  kind:'builtin' },
-  { label:'@setRuntimeSafety', detail:'(enabled: bool)  — toggle safety',  kind:'builtin' },
-  { label:'@setCold',        detail:'(val: bool)  — hint cold path',       kind:'builtin' },
-  // ── keywords (also in ZIG_KW but shown with detail in AC) ─────────────────
-  ...Array.from(ZIG_KW).map(k => ({ label:k, detail:'Zig keyword',   kind:'keyword' })),
-  // ── built-in types ─────────────────────────────────────────────────────────
-  ...Array.from(ZIG_TY).map(t => ({ label:t, detail:'Built-in type', kind:'type' })),
+  // ── Top-level modules ──────────────────────────────────────────────────────
+  { label:'std/strutils',   detail:'String utilities — split, strip, replace, toUpper', kind:'module' },
+  { label:'std/sequtils',   detail:'Sequence utilities — map, filter, foldl, zip',     kind:'module' },
+  { label:'std/tables',     detail:'Hash tables — Table, OrderedTable, CountTable',    kind:'module' },
+  { label:'std/sets',       detail:'Hash sets — HashSet, toHashSet, incl, excl',       kind:'module' },
+  { label:'std/os',         detail:'OS — getEnv, sleep, existsFile, getCurrentDir',    kind:'module' },
+  { label:'std/osproc',     detail:'Processes — startProcess, execCmd, waitForExit',  kind:'module' },
+  { label:'std/strformat',  detail:'Formatted strings — fmt"interpolation"',           kind:'module' },
+  { label:'std/strscans',   detail:'String scanning — scanf, scanTuple',               kind:'module' },
+  { label:'std/math',       detail:'Math — sqrt, pow, sin, cos, ceil, floor, PI',      kind:'module' },
+  { label:'std/sugar',      detail:'Sugar — =>, dup, collect, capture',               kind:'module' },
+  { label:'std/options',    detail:'Option type — some(), none(), isSome, get',        kind:'module' },
+  { label:'std/results',    detail:'Result type — ok(), err(), isOk, value',           kind:'module' },
+  { label:'std/asyncdispatch', detail:'Async — async, await, waitFor, newAsyncSocket',kind:'module' },
+  { label:'std/asyncnet',   detail:'Async networking — AsyncSocket, dial, newServer',  kind:'module' },
+  { label:'std/net',        detail:'Networking — Socket, newSocket, connect, bind',    kind:'module' },
+  { label:'std/httpclient', detail:'HTTP client — newHttpClient, get, post',           kind:'module' },
+  { label:'std/json',       detail:'JSON — parseJson, %*, to(), JsonNode',             kind:'module' },
+  { label:'std/xmlparser',  detail:'XML parsing — parseXml, XmlNode',                 kind:'module' },
+  { label:'std/re',         detail:'Regex — match, find, replace, split, Regex',       kind:'module' },
+  { label:'std/times',      detail:'Date/time — now, getTime, format, Duration',       kind:'module' },
+  { label:'std/random',     detail:'Random — rand, shuffle, sample, initRand',         kind:'module' },
+  { label:'std/terminal',   detail:'Terminal — styledEcho, setForegroundColor',        kind:'module' },
+  { label:'std/logging',    detail:'Logging — newConsoleLogger, log, debug, info',     kind:'module' },
+  { label:'std/unittest',   detail:'Unit tests — suite, test, check, expect',          kind:'module' },
+  { label:'std/typetraits', detail:'Type traits — name, genericParams, isNamedTuple',  kind:'module' },
+  { label:'std/macros',     detail:'Macro API — NimNode, newTree, nnkStmtList',        kind:'module' },
+  { label:'std/genasts',    detail:'AST generation — genAst, genStmts',               kind:'module' },
+  { label:'std/enumerate',  detail:'enumerate() iterator',                             kind:'module' },
+  { label:'std/algorithm',  detail:'Sorting — sort, sorted, reverse, binarySearch',   kind:'module' },
+  { label:'std/deques',     detail:'Double-ended queue — Deque, addFirst, addLast',   kind:'module' },
+  { label:'std/heapqueue',  detail:'Priority queue — HeapQueue, push, pop, len',      kind:'module' },
+  { label:'std/bitops',     detail:'Bit operations — popcount, countLeadingZeroBits', kind:'module' },
+  { label:'std/parsecsv',   detail:'CSV parsing — CsvParser, open, readRow',          kind:'module' },
+  { label:'std/parsecfg',   detail:'INI/cfg parsing — loadConfig, getSectionValue',   kind:'module' },
+  { label:'std/streams',    detail:'I/O streams — StringStream, FileStream, read*',   kind:'module' },
+  { label:'std/memfiles',   detail:'Memory-mapped files — open, mapMem',              kind:'module' },
+  { label:'std/nativesockets', detail:'Low-level socket API',                         kind:'module' },
+  { label:'std/isolation',  detail:'Thread isolation — Isolated, extract',            kind:'module' },
+  { label:'std/locks',      detail:'Locks & conditions — Lock, acquire, release',     kind:'module' },
+  { label:'std/system',     detail:'Always imported — echo, len, add, inc, dec, new', kind:'module' },
+  // ── strutils procs ─────────────────────────────────────────────────────────
+  { label:'split',         detail:'(s, sep): seq[string]',                            kind:'fn' },
+  { label:'strip',         detail:'(s): string — trim whitespace',                    kind:'fn' },
+  { label:'replace',       detail:'(s, sub, by): string',                             kind:'fn' },
+  { label:'toLower',       detail:'(s): string',                                       kind:'fn' },
+  { label:'toUpper',       detail:'(s): string',                                       kind:'fn' },
+  { label:'contains',      detail:'(s, sub): bool',                                   kind:'fn' },
+  { label:'startsWith',    detail:'(s, prefix): bool',                                kind:'fn' },
+  { label:'endsWith',      detail:'(s, suffix): bool',                                kind:'fn' },
+  { label:'parseInt',      detail:'(s): int',                                         kind:'fn' },
+  { label:'parseFloat',    detail:'(s): float',                                       kind:'fn' },
+  { label:'join',          detail:'(parts, sep): string',                             kind:'fn' },
+  { label:'repeat',        detail:'(s, n): string',                                   kind:'fn' },
+  { label:'format',        detail:'(fmt, args): string',                              kind:'fn' },
+  { label:'removePrefix',  detail:'(s, prefix): string',                              kind:'fn' },
+  { label:'removeSuffix',  detail:'(s, suffix): string',                              kind:'fn' },
+  { label:'indent',        detail:'(s, count): string',                               kind:'fn' },
+  // ── sequtils procs ─────────────────────────────────────────────────────────
+  { label:'map',           detail:'(s, f): seq  — transform each element',            kind:'fn' },
+  { label:'filter',        detail:'(s, pred): seq  — keep matching elements',         kind:'fn' },
+  { label:'foldl',         detail:'(s, op, initial)  — reduce left',                 kind:'fn' },
+  { label:'foldr',         detail:'(s, op, initial)  — reduce right',                kind:'fn' },
+  { label:'any',           detail:'(s, pred): bool',                                  kind:'fn' },
+  { label:'all',           detail:'(s, pred): bool',                                  kind:'fn' },
+  { label:'zip',           detail:'(a, b): seq[tuple]',                               kind:'fn' },
+  { label:'unzip',         detail:'(s): (seq, seq)',                                  kind:'fn' },
+  { label:'deduplicate',   detail:'(s): seq  — remove duplicates',                   kind:'fn' },
+  { label:'flatten',       detail:'(s): seq  — flatten one level',                   kind:'fn' },
+  // ── tables procs ───────────────────────────────────────────────────────────
+  { label:'initTable',     detail:'[K,V](): Table[K,V]',                              kind:'fn' },
+  { label:'initOrderedTable', detail:'[K,V](): OrderedTable[K,V]',                   kind:'fn' },
+  { label:'initCountTable', detail:'[K](): CountTable[K]',                            kind:'fn' },
+  { label:'toTable',       detail:'(pairs): Table',                                   kind:'fn' },
+  { label:'hasKey',        detail:'(t, key): bool',                                   kind:'fn' },
+  { label:'getOrDefault',  detail:'(t, key, default): V',                            kind:'fn' },
+  { label:'keys',          detail:'(t): iterator of K',                               kind:'fn' },
+  { label:'values',        detail:'(t): iterator of V',                               kind:'fn' },
+  { label:'pairs',         detail:'(t): iterator of (K, V)',                          kind:'fn' },
+  // ── system / built-ins ─────────────────────────────────────────────────────
+  { label:'echo',          detail:'(args) — print to stdout with newline',            kind:'fn' },
+  { label:'debugEcho',     detail:'(args) — always print regardless of -d:release',  kind:'fn' },
+  { label:'inc',           detail:'(x) — increment variable',                        kind:'fn' },
+  { label:'dec',           detail:'(x) — decrement variable',                        kind:'fn' },
+  { label:'new',           detail:'(T): ref T — allocate ref object',                kind:'fn' },
+  { label:'newSeq',        detail:'[T](len): seq[T]',                                 kind:'fn' },
+  { label:'newString',     detail:'(len): string',                                    kind:'fn' },
+  { label:'len',           detail:'(s): int',                                         kind:'fn' },
+  { label:'high',          detail:'(s): int — last valid index',                     kind:'fn' },
+  { label:'low',           detail:'(s): int — first valid index',                    kind:'fn' },
+  { label:'add',           detail:'(s, item) — append to seq/string',                kind:'fn' },
+  { label:'del',           detail:'(s, i) — delete element at index',                kind:'fn' },
+  { label:'pop',           detail:'(s): T — remove and return last',                 kind:'fn' },
+  { label:'insert',        detail:'(s, item, i) — insert at index',                  kind:'fn' },
+  { label:'contains',      detail:'(s, item): bool',                                  kind:'fn' },
+  { label:'repr',          detail:'(x): string — debug representation',              kind:'fn' },
+  { label:'typeof',        detail:'(x): type — type of expression',                  kind:'fn' },
+  { label:'ord',           detail:'(x): int — ordinal value',                        kind:'fn' },
+  { label:'chr',           detail:'(i): char',                                        kind:'fn' },
+  { label:'succ',          detail:'(x): T — successor',                              kind:'fn' },
+  { label:'pred',          detail:'(x): T — predecessor',                            kind:'fn' },
+  { label:'swap',          detail:'(a, b) — swap values',                            kind:'fn' },
+  { label:'min',           detail:'(a, b): T',                                        kind:'fn' },
+  { label:'max',           detail:'(a, b): T',                                        kind:'fn' },
+  { label:'abs',           detail:'(x): T — absolute value',                         kind:'fn' },
+  { label:'clamp',         detail:'(x, lo, hi): T',                                  kind:'fn' },
+  { label:'isNil',         detail:'(x): bool — check for nil',                       kind:'fn' },
+  { label:'quit',          detail:'(code=0) — exit program',                         kind:'fn' },
+  // ── keywords (NIM_KW) ──────────────────────────────────────────────────────
+  ...Array.from(NIM_KW).map(k => ({ label:k, detail:'Nim keyword',   kind:'keyword' })),
+  // ── built-in types (NIM_TY) ────────────────────────────────────────────────
+  ...Array.from(NIM_TY).map(t => ({ label:t, detail:'Built-in type', kind:'type' })),
 ]
-
 // Build a prefix-indexed trie for O(1) lookup instead of scanning all items
 const AC_INDEX = new Map()
 COMPLETE_ITEMS.forEach(item => {
@@ -502,12 +517,15 @@ function acClose() {
   if (p) p.remove()
 }
 
+// Font size — declared here so boot() can read it
+
+
 // ── State ─────────────────────────────────────────────────────────────────────
 const S = {
   tabs: [], activeTab: null,
   tree: null, expanded: new Set(),
   sbW: 240, termH: 250, drag: null,
-  zigInfo: { version:'…', path:'', os:'', arch:'' },
+  nimInfo: { version:'…', path:'', os:'', arch:'' },
   running: false,
   diagsByFile: {},
   gitStatus: { hasGit:false, branch:'main', modified:[], added:[], untracked:[], deleted:[] },
@@ -522,6 +540,7 @@ const S = {
   _hlTimer: 0,
   _acTimer: 0,
   _lastLineCount: 0,
+  _mmTimer: 0,
 }
 
 // ── DOM helpers ───────────────────────────────────────────────────────────────
@@ -531,7 +550,7 @@ function mk(t,c){ const e=document.createElement(t); if(c)e.className=c; return 
 function mkt(t,c,tx){ const e=mk(t,c); e.textContent=tx; return e }
 function escH(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') }
 function bn(p){ return (p||'').replace(/\\/g,'/').split('/').pop() }
-function langOf(p){ return (p||'').endsWith('.zig')?'zig':'text' }
+function langOf(p){ return (p||'').endsWith('.nim')||(p||'').endsWith('.nims')||(p||'').endsWith('.nimble')?'nim':'text' }
 function extOf(n){ const i=n.lastIndexOf('.'); return i>=0?n.slice(i+1):'' }
 
 function recent() {
@@ -559,6 +578,9 @@ function pushRecent(p) {
 // ══════════════════════════════════════════════════════════════════════════════
 
 // ── Settings state ─────────────────────────────────────────────────────────
+// Font size — must be before boot()
+let _fontSize = parseInt(localStorage.getItem('ferrum-fontsize') || '13', 10)
+
 const PREFS = {
   fontSize:  parseInt(localStorage.getItem('fs:fontSize')  || '13'),
   tabSize:   parseInt(localStorage.getItem('fs:tabSize')   || '4'),
@@ -692,18 +714,20 @@ function buildSettingsPanel() {
       </label>
     </div>
     <div class="setting-group">
-      <div class="setting-label">Zig Path</div>
-      <div class="setting-zig-path" id="zig-path-display" style="font-family:var(--mono);font-size:11px;color:var(--tx2);padding:4px 0;word-break:break-all"></div>
+      <div class="setting-label">Nim Path</div>
+      <div class="setting-zig-path" id="nim-path-display" style="font-family:var(--mono);font-size:11px;color:var(--tx2);padding:4px 0;word-break:break-all"></div>
       <div class="setting-row" style="margin-top:6px">
-        <button class="wbtn small" id="settings-retry-zig">↻ Retry detect</button>
-        <button class="wbtn small" id="settings-browse-zig">📂 Browse…</button>
+        <button class="wbtn small" id="settings-retry-nim">R Retry detect</button>
+        <button class="wbtn small" id="settings-browse-nim">Browse...</button>
       </div>
     </div>
     <div class="setting-group">
       <div class="setting-label">About</div>
-      <div class="setting-hint">Ferrum Studio — The Zig IDE</div>
+      <div class="setting-hint">Ferrum Studio — The Nim IDE</div>
       <div class="setting-hint">Built with Wails + Go + Vanilla JS</div>
-      <div class="setting-hint">Open source. Made for Zig developers.</div>
+      <div class="setting-hint">Open source. Made for Nim developers.</div>
+      <div class="setting-hint">Made by Czax. Follow me on GitHub --> https://github.com/CzaxStudio</div>
+      <div class="setting-hint">Special thanks to Claude AI and VS Code.</div>
     </div>`
 
   wrap.appendChild(body)
@@ -744,21 +768,21 @@ function buildSettingsPanel() {
       savePrefs(); applyPrefs()
     })
     // Zig path display
-    const zpd = document.getElementById('zig-path-display')
-    if (zpd) zpd.textContent = S.zigInfo?.path || 'not found'
+    const zpd = document.getElementById('nim-path-display')
+    if (zpd) zpd.textContent = S.nimInfo?.path || 'not found'
     // Retry / Browse
-    document.getElementById('settings-retry-zig')?.addEventListener('click', async () => {
-      const info = await go('RetryZigDetection')
-      updateZigBadge(info)
-      if (document.getElementById('zig-path-display')) document.getElementById('zig-path-display').textContent = info?.path || 'not found'
-      tLine(info?.version !== 'not found' ? '✓ Zig: ' + info.version : '✗ Still not found', info?.version !== 'not found' ? '#4ade80' : '#f87171')
+    document.getElementById('settings-retry-nim')?.addEventListener('click', async () => {
+      const info = await go('RetryNimDetection')
+      updateNimBadge(info)
+      if (document.getElementById('nim-path-display')) document.getElementById('nim-path-display').textContent = info?.path || 'not found'
+      tLine(info?.version !== 'not found' ? 'Nim: ' + info.version : 'Still not found', info?.version !== 'not found' ? '#4ade80' : '#f87171')
     })
-    document.getElementById('settings-browse-zig')?.addEventListener('click', async () => {
-      const ver = await go('BrowseForZig')
+    document.getElementById('settings-browse-nim')?.addEventListener('click', async () => {
+      const ver = await go('BrowseForNim')
       if (ver && !ver.startsWith('not') && !ver.startsWith('error')) {
-        const info = await go('GetZigInfo'); updateZigBadge(info)
-        if (document.getElementById('zig-path-display')) document.getElementById('zig-path-display').textContent = info?.path || ''
-        tLine('✓ Zig set: ' + ver, '#4ade80')
+        const info = await go('GetNimInfo'); updateNimBadge(info)
+        if (document.getElementById('nim-path-display')) document.getElementById('nim-path-display').textContent = info?.path || ''
+        tLine('Nim set: ' + ver, '#4ade80')
       }
     })
   }, 0)
@@ -767,50 +791,409 @@ function buildSettingsPanel() {
 
 // ── Zig Stdlib Docs Browser ─────────────────────────────────────────────────
 const STD_DOCS = [
-  { name:'std.io',       desc:'I/O streams, readers, writers',
-    members:['getStdOut() File.Writer','getStdIn() File.Reader','getStdErr() File.Writer','Reader','Writer','BufferedReader(T)','BufferedWriter(T)','AnyReader','AnyWriter'] },
-  { name:'std.fmt',      desc:'Formatting, printing, parsing',
-    members:['allocPrint(alloc, fmt, args) ![]u8','bufPrint(buf, fmt, args) ![]u8','parseInt(T, str, base) !T','parseFloat(T, str) !T','format(writer, fmt, args) !void','countFmt(fmt, args) usize'] },
-  { name:'std.mem',      desc:'Memory manipulation and allocators',
-    members:['eql(T, a, b) bool','copy(T, dest, src)','concat(T, alloc, slices) ![]T','split(T, buf, delim) SplitIter','tokenize(T, buf, delim) TokenIter','trim(T, slice, vals) []T','startsWith(T, s, prefix) bool','endsWith(T, s, suffix) bool','indexOf(T, s, needle) ?usize','Allocator','zeroes(T) T','bytesAsSlice(T, bytes) []T','sliceAsBytes(slice) []u8'] },
-  { name:'std.math',     desc:'Math functions and constants',
-    members:['sqrt(x) T','abs(x) T','min(a,b) T','max(a,b) T','pow(T, base, exp) T','log(x) T','log2(x) T','ceil(x) T','floor(x) T','round(x) T','sin(x) T','cos(x) T','tan(x) T','pi: comptime_float','inf: comptime_float','nan: comptime_float','maxInt(T) comptime_int','minInt(T) comptime_int','clamp(val,lo,hi) T'] },
-  { name:'std.testing',  desc:'Test assertions and utilities',
-    members:['expect(ok: bool) !void','expectEqual(exp, act) !void','expectEqualStrings(exp, act) !void','expectEqualSlices(T, exp, act) !void','expectError(err, expr) !void','expectApproxEqAbs(exp, act, tol) !void','allocator: Allocator','refAllDecls(T)'] },
-  { name:'std.debug',    desc:'Debugging utilities',
-    members:['print(fmt, args)','assert(ok: bool)','panic(fmt, args) noreturn','dumpCurrentStackTrace(ret_addr)'] },
-  { name:'std.heap',     desc:'Memory allocators',
-    members:['page_allocator: Allocator','GeneralPurposeAllocator(.{}) — leak detection','ArenaAllocator.init(child) — free all at once','FixedBufferAllocator.init(buf) — stack backed','c_allocator: Allocator — libc malloc/free'] },
-  { name:'std.fs',       desc:'Filesystem access',
-    members:['cwd() Dir','openFileAbsolute(path, flags) !File','createFileAbsolute(path, flags) !File','Dir.openFile(path, flags) !File','Dir.createFile(path, flags) !File','Dir.makeDir(path) !void','Dir.deleteFile(path) !void','Dir.deleteDir(path) !void','Dir.iterate() Iterator','File.read(buf) !usize','File.write(buf) !usize','File.close()'] },
-  { name:'std.process',  desc:'Process and environment',
-    members:['argsAlloc(alloc) ![][]u8','argsFree(alloc, args)','exit(code: u8) noreturn','getEnvVarOwned(alloc, name) ![]u8','getEnvMap(alloc) !EnvMap','abort() noreturn'] },
-  { name:'std.os',       desc:'Low-level OS primitives (prefer std.fs)',
-    members:['windows','linux','darwin','posix','getenv(name) ?[]const u8','exit(status: u8) noreturn'] },
-  { name:'std.net',      desc:'Networking',
-    members:['Address.parseIp(addr, port) !Address','Address.listen(opts) !Server','tcpConnectToHost(alloc, host, port) !Stream','Stream.read(buf) !usize','Stream.write(buf) !usize','Stream.close()'] },
-  { name:'std.time',     desc:'Time and timers',
-    members:['milliTimestamp() i64','microTimestamp() i64','nanoTimestamp() i128','sleep(nanoseconds: u64)','Timer.start() !Timer','Timer.read() u64','Timer.lap() u64'] },
-  { name:'std.ArrayList',desc:'Dynamic array',
-    members:['init(alloc) ArrayList(T)','deinit()','append(item) !void','appendSlice(items) !void','pop() T','insert(i, item) !void','orderedRemove(i) T','items: []T','len: usize','capacity: usize','toOwnedSlice() ![]T','clearRetainingCapacity()'] },
-  { name:'std.HashMap',  desc:'Hash maps',
-    members:['StringHashMap(V).init(alloc)','AutoHashMap(K,V).init(alloc)','put(key, val) !void','get(key) ?V','getOrPut(key) !Entry','remove(key) bool','contains(key) bool','count() usize','iterator() Iterator','deinit()','clearRetainingCapacity()'] },
-  { name:'std.json',     desc:'JSON parsing and serialization',
-    members:['parseFromSlice(T, alloc, input, opts) !Parsed(T)','Parsed(T).deinit()','stringify(val, opts, writer) !void','stringifyAlloc(alloc, val, opts) ![]u8'] },
-  { name:'std.crypto',   desc:'Cryptography primitives',
-    members:['random: std.rand.Random','hash.sha2.Sha256.hash(msg, out, opts)','hash.blake3.Blake3.hash(msg, out, opts)','aes.Aes128','hmac.HmacSha256'] },
-  { name:'std.unicode',  desc:'Unicode utilities',
-    members:['utf8Decode(bytes) !u21','utf8Encode(codepoint, buf) !u3','Utf8View.init(bytes) !Utf8View','Utf8Iterator','utf8CountCodepoints(bytes) !usize','utf8ValidateSlice(bytes) bool'] },
-  { name:'std.sort',     desc:'Sorting algorithms',
-    members:['sort(T, items, ctx, lessThan)','asc(T) fn','desc(T) fn','isSorted(T, items, ctx, lessThan) bool','binarySearch(T, key, items, ctx, order) ?usize'] },
-  { name:'std.builtin',  desc:'Compiler builtins and type info',
-    members:['Type (union with struct/enum/fn/etc info)','CallingConvention','OptimizeMode','Target','cpu.Arch','os.Tag','abi.ABI'] },
+  { name:'system',      desc:'Auto-imported — echo, len, add, inc, new, quit, assert',
+    members:['echo(args)',
+             'len(s): int',
+             'add(s: var seq, item)',
+             'del(s: var seq, i)',
+             'pop(s: var seq): T',
+             'inc(x: var int)',
+             'dec(x: var int)',
+             'new(T): ref T',
+             'newSeq[T](len): seq[T]',
+             'newString(len): string',
+             'high(s): int',
+             'low(s): int',
+             'ord(x): int',
+             'chr(i): char',
+             'repr(x): string',
+             'isNil(x): bool',
+             'sizeof(x): int',
+             'typeof(x): type',
+             'swap(a, b)',
+             'min(a, b): T',
+             'max(a, b): T',
+             'abs(x): T',
+             'clamp(x, lo, hi): T',
+             'quit(code=0)',
+             'assert(cond, msg)',
+             'doAssert(cond, msg)',
+             'when nimvm: — compile-time branch'] },
+
+  { name:'std/strutils', desc:'String utilities',
+    members:['split(s, sep): seq[string]',
+             'splitWhitespace(s): seq[string]',
+             'strip(s): string',
+             'strip(s, leading, trailing, chars): string',
+             'replace(s, sub, by): string',
+             'toLower(s): string',
+             'toUpper(s): string',
+             'capitalize(s): string',
+             'contains(s, sub): bool',
+             'startsWith(s, prefix): bool',
+             'endsWith(s, suffix): bool',
+             'parseInt(s): int',
+             'parseBiggestInt(s): BiggestInt',
+             'parseFloat(s): float',
+             'parseBool(s): bool',
+             'join(parts: seq, sep): string',
+             'repeat(s, n): string',
+             'indent(s, count): string',
+             'dedent(s): string',
+             'removePrefix(s, prefix)',
+             'removeSuffix(s, suffix)',
+             'count(s, sub): int',
+             'find(s, sub, start, last): int',
+             'rfind(s, sub): int',
+             'isAlphaAscii(s): bool',
+             'isDigit(s): bool',
+             'isSpace(s): bool',
+             'format(fmt, args): string — % operator',
+             'multiReplace(s, replacements): string'] },
+
+  { name:'std/sequtils', desc:'Sequence and iterable utilities',
+    members:['map(s, f): seq',
+             'filter(s, pred): seq',
+             'keepIf(s: var seq, pred)',
+             'foldl(s, op): T',
+             'foldr(s, op): T',
+             'any(s, pred): bool',
+             'all(s, pred): bool',
+             'count(s, item): int',
+             'zip(a, b): seq[tuple]',
+             'unzip(s): (seq, seq)',
+             'flatten(s): seq',
+             'deduplicate(s): seq',
+             'distribute(s, num): seq[seq]',
+             'cycle(s, times): seq',
+             'repeat(item, count): seq',
+             'concat(seqs): seq',
+             'insert(s: var seq, item, i)',
+             'toSeq(iter): seq',
+             'mapIt(s, expr): seq — macro',
+             'filterIt(s, cond): seq — macro',
+             'anyIt(s, cond): bool — macro',
+             'allIt(s, cond): bool — macro',
+             'countIt(s, cond): int — macro'] },
+
+  { name:'std/tables',   desc:'Hash tables',
+    members:['initTable[K, V](): Table[K, V]',
+             'initOrderedTable[K, V](): OrderedTable[K, V]',
+             'initCountTable[K](): CountTable[K]',
+             'toTable(pairs): Table',
+             'toOrderedTable(pairs): OrderedTable',
+             't[key]: V — index access',
+             't.getOrDefault(key, default): V',
+             't.hasKey(key): bool',
+             't.contains(key): bool',
+             't.del(key)',
+             't.pop(key, val: var V): bool',
+             't.len: int',
+             't.pairs(): (K, V) iterator',
+             't.keys(): K iterator',
+             't.values(): V iterator',
+             't.mvalues(): var V iterator',
+             't.merge(t2)',
+             'CountTable.inc(key)',
+             'CountTable.largest(): (K, int)'] },
+
+  { name:'std/os',       desc:'Operating system interface',
+    members:['getCurrentDir(): string',
+             'setCurrentDir(path)',
+             'getHomeDir(): string',
+             'getTempDir(): string',
+             'getAppDir(): string',
+             'getEnv(key, default): string',
+             'existsEnv(key): bool',
+             'putEnv(key, val)',
+             'commandLineParams(): seq[string]',
+             'getAppFilename(): string',
+             'fileExists(path): bool',
+             'dirExists(path): bool',
+             'createDir(path)',
+             'createDirs(path)',
+             'removeDir(path)',
+             'removeFile(path)',
+             'copyFile(src, dest)',
+             'moveFile(src, dest)',
+             'copyDir(src, dest)',
+             'renameFile(old, new)',
+             'walkFiles(pattern): iterator',
+             'walkDir(path): iterator',
+             'walkDirRec(path): iterator',
+             'splitPath(path): tuple',
+             'joinPath(parts): string',
+             'expandFilename(path): string',
+             'normalizedPath(path): string',
+             'isAbsolute(path): bool',
+             'relativePath(path, base): string',
+             'sleep(milsecs: int)',
+             'quoteShell(s): string',
+             'DirSep: char',
+             'PathSep: char'] },
+
+  { name:'std/json',     desc:'JSON parsing and serialization',
+    members:['parseJson(s): JsonNode',
+             'to[T](node): T — deserialize to type',
+             '% value: JsonNode — construct JSON',
+             '%* expr: JsonNode — construct from literal',
+             'JsonNode.kind: JNodeKind',
+             'JsonNode.str: string',
+             'JsonNode.num: float',
+             'JsonNode.getBool: bool',
+             'JsonNode.getInt: int',
+             'JsonNode.getFloat: float',
+             'JsonNode.getStr: string',
+             'JsonNode.hasKey(key): bool',
+             'JsonNode[key]: JsonNode',
+             'JsonNode.getOrDefault(key): JsonNode',
+             'JsonNode.len: int',
+             'JsonNode.add(item)',
+             'JsonNode.delete(key)',
+             'JsonNode.pairs(): iterator',
+             'JsonNode.elems: seq[JsonNode]',
+             'pretty(node, indent): string',
+             '$node: string',
+             'newJNull(): JsonNode',
+             'newJBool(b): JsonNode',
+             'newJInt(n): JsonNode',
+             'newJFloat(f): JsonNode',
+             'newJString(s): JsonNode',
+             'newJArray(): JsonNode',
+             'newJObject(): JsonNode'] },
+
+  { name:'std/asyncdispatch', desc:'Async/await and event loop',
+    members:['async pragma — marks proc as async',
+             'await expr — wait for Future',
+             'waitFor(future) — block until done',
+             'newAsyncSocket(): AsyncSocket',
+             'newAsyncHttpServer(): AsyncHttpServer',
+             'poll(timeout) — run event loop once',
+             'runForever() — run event loop',
+             'sleepAsync(ms): Future[void]',
+             'Future[T] — result of async proc',
+             'newFuture[T](name): Future[T]',
+             'future.complete(val)',
+             'future.fail(error)',
+             'future.read(): T',
+             'future.finished: bool',
+             'future.failed: bool',
+             'all(futures): Future[seq[T]]',
+             'race(futures): Future[T]',
+             'withTimeout(future, ms): Future[bool]',
+             'callSoon(cb)',
+             'addTimer(ms, oneshot, cb)'] },
+
+  { name:'std/httpclient', desc:'HTTP client',
+    members:['newHttpClient(): HttpClient',
+             'newAsyncHttpClient(): AsyncHttpClient',
+             'client.get(url): Response',
+             'client.post(url, body): Response',
+             'client.request(url, httpMethod, body): Response',
+             'client.headers: HttpHeaders',
+             'client.timeout: int',
+             'client.close()',
+             'Response.status: string',
+             'Response.code: HttpCode',
+             'Response.body: string',
+             'Response.headers: HttpHeaders',
+             'newHttpHeaders(pairs): HttpHeaders',
+             'Http200, Http404, Http500 — status codes'] },
+
+  { name:'std/re',       desc:'Regular expressions',
+    members:['re(pattern): Regex — compile pattern',
+             'match(s, pattern): bool',
+             'match(s, regex, m: var RegexMatch): bool',
+             'find(s, regex, start): int',
+             'findAll(s, regex): seq[string]',
+             'findBounds(s, regex): Slice[int]',
+             'replace(s, regex, by): string',
+             'replacef(s, regex, by): string',
+             'split(s, regex): seq[string]',
+             'captures(m): seq[string]',
+             'captureBounds(m): seq[Slice]',
+             'groupCount(regex): int'] },
+
+  { name:'std/math',     desc:'Mathematical functions and constants',
+    members:['PI: float64',
+             'E: float64',
+             'sqrt(x): float',
+             'cbrt(x): float',
+             'pow(x, y): float',
+             'exp(x): float',
+             'ln(x): float',
+             'log2(x): float',
+             'log10(x): float',
+             'sin(x): float',
+             'cos(x): float',
+             'tan(x): float',
+             'arcsin(x): float',
+             'arccos(x): float',
+             'arctan(x): float',
+             'arctan2(y, x): float',
+             'hypot(x, y): float',
+             'ceil(x): float',
+             'floor(x): float',
+             'round(x): float',
+             'trunc(x): float',
+             'abs(x): float',
+             'sgn(x): int',
+             'isNaN(x): bool',
+             'isInf(x): bool',
+             'floorDiv(x, y): int',
+             'floorMod(x, y): int',
+             'gcd(x, y): int',
+             'lcm(x, y): int',
+             'clamp(x, lo, hi): T',
+             'nextPowerOfTwo(x): int'] },
+
+  { name:'std/options',  desc:'Optional values',
+    members:['some(val): Option[T] — wrap a value',
+             'none(T): Option[T] — empty option',
+             'isSome(opt): bool',
+             'isNone(opt): bool',
+             'get(opt): T — raises if none',
+             'get(opt, default): T',
+             'unsafeGet(opt): T',
+             'map(opt, f): Option',
+             'flatMap(opt, f): Option',
+             'filter(opt, pred): Option',
+             'Option.get() — raise Defect if none',
+             'when opt.isSome: opt.get()'] },
+
+  { name:'std/strformat', desc:'String interpolation',
+    members:['fmt"..." — interpolate with {}',
+             'fmt"{x}" — insert variable',
+             'fmt"{x:.2f}" — float with 2 decimals',
+             'fmt"{x:>10}" — right-align width 10',
+             'fmt"{x:<10}" — left-align width 10',
+             'fmt"{x:0>5}" — zero-pad',
+             'fmt"{x:#b}" — binary',
+             'fmt"{x:#o}" — octal',
+             'fmt"{x:#x}" — hex',
+             '&"..." — same as fmt but explicit'] },
+
+  { name:'std/times',    desc:'Date and time',
+    members:['now(): DateTime',
+             'getTime(): Time',
+             'cpuTime(): float — seconds since start',
+             'epochTime(): float — Unix timestamp',
+             'DateTime.year, month, day, hour, minute, second',
+             'initDateTime(day, month, year, ...): DateTime',
+             'parse(s, fmt): DateTime',
+             'format(dt, fmt): string',
+             'toTime(dt): Time',
+             'toUnix(t): int64',
+             'fromUnix(i): Time',
+             'Duration — nanoseconds type',
+             'initDuration(seconds, milliseconds, ...): Duration',
+             'inSeconds(d): int64',
+             'inMilliseconds(d): int64',
+             'dt + duration: DateTime',
+             'dt - dt2: Duration',
+             'getClockStr(): string',
+             'getDateStr(): string'] },
+
+  { name:'std/random',   desc:'Random number generation',
+    members:['randomize() — seed from time',
+             'randomize(seed)',
+             'rand(max): int — 0..max-1',
+             'rand(range): T — from range',
+             'rand(f: float): float — 0.0..f',
+             'sample(s: seq): T',
+             'shuffle(s: var seq)',
+             'initRand(seed): Rand',
+             'Rand.rand(max): int',
+             'Rand.sample(s): T',
+             'Rand.shuffle(s: var seq)'] },
+
+  { name:'std/algorithm', desc:'Sorting and searching',
+    members:['sort(s: var seq)',
+             'sort(s: var seq, cmp)',
+             'sorted(s: seq): seq',
+             'sortedByIt(s, expr): seq — macro',
+             'reverse(s: var seq)',
+             'reversed(s: seq): seq',
+             'binarySearch(s, key): int',
+             'lowerBound(s, key): int',
+             'upperBound(s, key): int',
+             'nextPermutation(s: var seq): bool',
+             'prevPermutation(s: var seq): bool',
+             'isSorted(s): bool',
+             'Ascending, Descending — order enum'] },
+
+  { name:'std/sets',     desc:'Hash sets',
+    members:['toHashSet(items): HashSet[T]',
+             'initHashSet[T](): HashSet[T]',
+             'initOrderedSet[T](): OrderedSet[T]',
+             'incl(s: var HashSet, item)',
+             'excl(s: var HashSet, item)',
+             'contains(s, item): bool',
+             'card(s): int — cardinality',
+             'union(a, b): HashSet',
+             'intersection(a, b): HashSet',
+             'difference(a, b): HashSet',
+             'symmetricDifference(a, b): HashSet',
+             'isSubset(a, b): bool',
+             'items(s): iterator'] },
+
+  { name:'std/macros',   desc:'Macro development API',
+    members:['NimNode — AST node type',
+             'newTree(kind, children): NimNode',
+             'newLit(val): NimNode — literal node',
+             'newIdentNode(name): NimNode',
+             'newStrLitNode(s): NimNode',
+             'newIntLitNode(i): NimNode',
+             'newEmptyNode(): NimNode',
+             'newStmtList(nodes): NimNode',
+             'newCall(name, args): NimNode',
+             'newProc(name, params, body): NimNode',
+             'newNimNode(kind): NimNode',
+             'quote do: block — hygienic quoting',
+             'getAst(call): NimNode',
+             'parseExpr(s): NimNode',
+             'parseStmt(s): NimNode',
+             'repr(node): string — node to code',
+             'treeRepr(node): string — debug view',
+             'lispRepr(node): string',
+             'node.kind: NimNodeKind',
+             'node.len: int',
+             'node[i]: NimNode',
+             'node.add(child)',
+             'node.strVal: string',
+             'node.intVal: BiggestInt',
+             'node.floatVal: BiggestFloat',
+             'node.symbol: NimSym',
+             'nnkIdent, nnkStrLit, nnkIntLit, etc — node kinds',
+             'bindSym("name"): NimNode',
+             'genSym(kind, name): NimNode — unique ident',
+             'copyNimNode(n): NimNode',
+             'copyNimTree(n): NimNode',
+             'expectKind(n, kind)',
+             'expectLen(n, len)',
+             'error(msg, n) — compile error',
+             'warning(msg, n)',
+             'hint(msg, n)'] },
+
+  { name:'std/typetraits', desc:'Compile-time type inspection',
+    members:['name(T): string — type name as string',
+             'genericParams(T): typedesc — get generic params',
+             'isNamedTuple(T): bool',
+             'distinctBase(T): typedesc',
+             'tupleLen(T): int',
+             'get(T, i): typedesc — tuple element type',
+             'elementType(T): typedesc — seq/array element',
+             'supportsCopyMem(T): bool',
+             'isRef(T): bool',
+             'isPtr(T): bool',
+             'isProc(T): bool',
+             'compiles(expr): bool — CT check'] },
 ]
 
 function buildDocsPanel() {
   const wrap = mk('div', 'sb-panel-inner')
   const hdr = mk('div', 'sb-hdr')
-  hdr.innerHTML = `<span class="sb-title">ZIG STDLIB</span>`
+  hdr.innerHTML = `<span class="sb-title">NIM STDLIB</span>`
   wrap.appendChild(hdr)
 
   const searchRow = mk('div', 'docs-search-row')
@@ -908,9 +1291,10 @@ function updateMinimap() {
   _mmRaf = requestAnimationFrame(() => {
     const canvas = document.getElementById('minimap-canvas')
     const mm = document.getElementById('minimap')
-    const pane = document.getElementById('code-pane')
+    const ta2 = document.getElementById('editor-ta')
     const tab = activeTab()
-    if (!canvas || !mm || !pane || !tab) return
+    if (!canvas || !mm || !ta2 || !tab) return
+    const pane = ta2
 
     const mmH = mm.clientHeight || 400
     canvas.height = mmH
@@ -998,7 +1382,7 @@ function renderMultiCursors(ta) {
       'height:' + lineH + 'px;' +
       'background:rgba(249,115,22,.25);' +
       'pointer-events:none;z-index:4;'
-    document.getElementById('editor-inner')?.appendChild(highlight)
+    document.getElementById('code-pane')?.appendChild(highlight)
   })
 }
 
@@ -1036,7 +1420,7 @@ function zoomFont(delta) {
 }
 
 // ── Memory leak detector ─────────────────────────────────────────────────────
-// Parses GPA leak output from zig run/test and adds to Problems panel
+// Parses GPA/valgrind leak output from nim run/test and adds to Problems panel
 function parseLeaks(output) {
   const leaks = []
   // Pattern: "leak at address 0x..., allocated here:"
@@ -1052,7 +1436,7 @@ function parseLeaks(output) {
       inLeak = true
     }
     if (inLeak) {
-      const m = line.match(/([^:]+\.zig):(\d+):(\d+)/)
+      const m = line.match(/([^:]+\.nim):(\d+):(\d+)/)
       if (m) {
         leaks.push({
           file:    m[1],
@@ -1072,17 +1456,17 @@ function parseLeaks(output) {
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
 async function boot() {
-  S.tabs.push({ id:'demo', path:null, name:'main.zig', content:DEMO, dirty:false, lang:'zig' })
+  S.tabs.push({ id:'demo', path:null, name:'main.nim', content:DEMO, dirty:false, lang:'nim' })
   S.activeTab = 'demo'
   buildApp()
   wireAll()
-  tPrint('\x1b[33m  ⬡ Ferrum Studio\x1b[0m\x1b[2m — The Zig IDE\x1b[0m\n')
+  tPrint('\x1b[33m  Ferrum Studio\x1b[0m\x1b[2m — The Nim IDE\x1b[0m\n')
   tPrint('\x1b[2m  F5=Run  F6=Run+args  F7=Build  F8=Test  Ctrl+S=Save+Check  Ctrl+P=Quick Open\x1b[0m\n\n')
   // Async init
-  go('GetZigInfo').then(info => {
+  go('GetNimInfo').then(info => {
     if (!info) return
-    S.zigInfo = info
-    updateZigBadge(info)
+    S.nimInfo = info
+    updateNimBadge(info)
   })
   go('GetBuildSteps').then(steps => { if(steps) S.buildSteps = steps; renderBuildPanel() })
   // Restore font size from last session
@@ -1123,24 +1507,24 @@ function buildTitlebar() {
     <span class="logo-txt">Ferrum Studio</span>`
 
   const menu = mk('div','tb-menu')
-  ;[['File','m:file'],['Edit','m:edit'],['Run','m:run'],['Zig','m:zig'],['View','m:view']].forEach(([l,a])=>{
+  ;[['File','m:file'],['Edit','m:edit'],['Run','m:run'],['Nim','m:nim'],['View','m:view']].forEach(([l,a])=>{
     const b = mkt('button','menu-btn',l); b.dataset.a=a; menu.appendChild(b)
   })
 
   const acts = mk('div','tb-acts')
   acts.innerHTML = `
-    <button class="tbtn run-btn" data-a="z:run"      title="Run (F5)">▶ Run</button>
-    <button class="tbtn"         data-a="z:run-args"  title="Run with args (F6)">▶ …</button>
-    <button class="tbtn"         data-a="z:build"     title="zig build (F7)">⚙ Build</button>
-    <button class="tbtn"         data-a="z:test"      title="zig test (F8)">✦ Test</button>
-    <button class="tbtn"         data-a="z:fmt"       title="Format (Ctrl+Shift+F)">⟳ Fmt</button>
-    <button class="tbtn"         data-a="z:check"     title="Check (Ctrl+Shift+C)">✓ Check</button>
-    <button class="tbtn kill-btn hidden" id="kill-btn" data-a="z:kill">■ Stop</button>`
+    <button class="tbtn run-btn" data-a="z:run"      title="Run (F5)">Run</button>
+    <button class="tbtn"         data-a="z:run-args"  title="Run with args (F6)">Run...</button>
+    <button class="tbtn"         data-a="z:build"     title="nimble build (F7)">Build</button>
+    <button class="tbtn"         data-a="z:test"      title="nimble test (F8)">Test</button>
+    <button class="tbtn"         data-a="z:fmt"       title="Format (Ctrl+Shift+F)">Fmt</button>
+    <button class="tbtn"         data-a="z:check"     title="Check (Ctrl+Shift+C)">Check</button>
+    <button class="tbtn kill-btn hidden" id="kill-btn" data-a="z:kill">Stop</button>`
 
   const info = mk('div','tb-info')
   info.innerHTML = `
-    <span id="zig-badge" title="Zig version">zig ${S.zigInfo.version}</span>
-    <span id="plat-badge">${S.zigInfo.os}</span>`
+    <span id="nim-badge" style="cursor:pointer" title="Nim version">nim ${S.nimInfo.version}</span>
+    <span id="plat-badge">${S.nimInfo.os}</span>`
 
   bar.append(logo, menu, acts, info)
   return bar
@@ -1264,7 +1648,7 @@ function buildTreeView() {
   if (!S.tree) {
     const empty = mk('div','tree-empty')
     empty.innerHTML = `
-      <div class="empty-icon">◈</div>
+      <div class="empty-icon">[+]</div>
       <div class="empty-label">No folder open</div>
       <button class="wbtn primary small" data-a="open:folder">Open Folder</button>
       <button class="wbtn small" data-a="scaffold:open">New Project</button>`
@@ -1283,7 +1667,7 @@ function renderTreeNode(parent, node, depth) {
     row.style.paddingLeft = pad+'px'
     row.dataset.a = 'tree:dir'; row.dataset.path = node.path
     const gitMark = getGitMark(node.name)
-    row.innerHTML = `<span class="caret">${open?'▾':'▸'}</span><span class="tree-ico">${open?'📂':'📁'}</span><span class="tree-lbl">${escH(node.name)}</span>${gitMark}`
+    row.innerHTML = `<span class="caret">${open?'v':'>'}</span><span class="tree-ico">${open?'[dir]':'[dir]'}</span><span class="tree-lbl">${escH(node.name)}</span>${gitMark}`
     row.addEventListener('contextmenu', e => { e.preventDefault(); showTreeCtx(e, node) })
     parent.appendChild(row)
     if (open && node.children) node.children.forEach(c => renderTreeNode(parent, c, depth+1))
@@ -1317,7 +1701,7 @@ function getGitMark(name) {
 function fileIcon(name) {
   const e = extOf(name)
   return {
-    zig:['ico-zig','z'], md:['ico-md','m'], json:['ico-js','{}'],
+    nim:['ico-nim','n'], md:['ico-md','m'], json:['ico-js','{}'],
     zon:['ico-js','{}'], toml:['ico-t','t'], yaml:['ico-t','y'],
     js:['ico-js','js'], ts:['ico-js','ts'], c:['ico-c','c'],
     h:['ico-c','h'], cpp:['ico-c','c+'], py:['ico-py','py'],
@@ -1331,36 +1715,36 @@ function buildBuildPanel() {
   const hdr = mk('div','sb-hdr')
   hdr.appendChild(mkt('span','sb-title','BUILD TARGETS'))
   const refreshBtn = mk('button','icon-btn'); refreshBtn.title='Refresh'; refreshBtn.dataset.a='build:refresh'
-  refreshBtn.textContent='↺'; hdr.appendChild(refreshBtn)
+  refreshBtn.textContent='R'; hdr.appendChild(refreshBtn)
   wrap.appendChild(hdr)
 
   const list = mk('div','build-list'); list.id='build-list'
 
   const noBuild = !S.tree
   if (noBuild) {
-    list.innerHTML = '<div class="ref-empty">Open a project folder with build.zig</div>'
+    list.innerHTML = '<div class="ref-empty">Open a project folder with a .nimble file</div>'
   } else if (!S.buildSteps.length) {
     list.innerHTML = '<div class="ref-empty">No build steps found</div>'
   } else {
     S.buildSteps.forEach(step => {
       const row = mk('div','build-step-row')
       row.dataset.a = 'build:step'; row.dataset.name = step.name
-      const iconMap = { test:'✦', run:'▶', install:'⬇', clean:'🗑', build:'⚙' }
-      const icon = iconMap[step.kind] || '⚙'
+      const iconMap = { test:'+', run:'>', install:'v', clean:'x', build:'*' }
+      const icon = iconMap[step.kind] || '*'
       row.innerHTML = `
         <span class="build-step-icon ${step.kind}">${icon}</span>
         <div class="build-step-info">
           <span class="build-step-name">${escH(step.name)}</span>
           <span class="build-step-desc">${escH(step.desc)}</span>
         </div>
-        <button class="build-step-run" data-a="build:step" data-name="${escH(step.name)}" title="Run this step">▶</button>`
+        <button class="build-step-run" data-a="build:step" data-name="${escH(step.name)}" title="Run this step">></button>`
       list.appendChild(row)
     })
   }
 
   // New project button
   const foot = mk('div','build-footer')
-  const scaffoldBtn = mkt('button','wbtn small','⬡  New Zig Project')
+  const scaffoldBtn = mkt('button','wbtn small','New Nim Project')
   scaffoldBtn.dataset.a = 'scaffold:open'
   foot.appendChild(scaffoldBtn)
   wrap.append(list, foot)
@@ -1384,7 +1768,7 @@ function buildSnippetsPanel() {
 
   // Snippets
   const sHdr = mk('div','ref-sect-hdr')
-  sHdr.textContent = '▸ Snippets  (type + Tab)'
+  sHdr.textContent = '> Snippets  (type + Tab)'
   sHdr.dataset.a = 'ref:toggle'; sHdr.dataset.sect = 'snips'
   const sList = mk('div','ref-sect-body hidden'); sList.id = 'sect-snips'
   SNIPPETS.forEach(([trigger,display,]) => {
@@ -1398,26 +1782,26 @@ function buildSnippetsPanel() {
 
   // Std reference
   const STD = [
-    ['std.io', 'getStdOut(), getStdIn(), Writer, Reader, AnyWriter'],
-    ['std.fs', 'cwd(), openFile(), createFile(), Dir.walk()'],
-    ['std.mem', 'alloc(), free(), copy(), eql(), split(), Allocator'],
-    ['std.fmt', 'allocPrint(), bufPrint(), parseInt(), format()'],
-    ['std.math', 'sqrt(), sin(), cos(), abs(), max(), min(), inf, pi'],
-    ['std.testing', 'expect(), expectEqual(), expectError(), expectFmt()'],
-    ['std.process', 'argsAlloc(), argsFree(), exit(), getEnvMap()'],
-    ['std.time', 'milliTimestamp(), nanoTimestamp(), sleep()'],
-    ['std.Thread', 'spawn(), join(), Mutex, RwLock, Semaphore'],
-    ['std.ArrayList', 'init(), append(), pop(), items, capacity'],
-    ['std.HashMap', 'init(), put(), get(), remove(), iterator()'],
-    ['std.json', 'parse(), stringify(), Value, parseFromSlice()'],
-    ['std.crypto', 'random, hash, aes, sha2, hmac'],
-    ['std.net', 'tcpConnectToHost(), Address, Stream'],
-    ['std.sort', 'sort(), pdq(), asc(), desc()'],
-    ['std.unicode', 'utf8CountCodepoints(), Utf8View, Utf8Iterator'],
-    ['std.debug', 'print(), assert(), panic(), captureStackTrace()'],
+    ['system',          'echo, len, add, del, new, quit, assert, high, low'],
+    ['std/strutils',    'split, strip, replace, toLower, startsWith, parseInt'],
+    ['std/sequtils',    'map, filter, foldl, any, all, zip, toSeq, mapIt'],
+    ['std/tables',      'initTable, hasKey, getOrDefault, pairs, keys'],
+    ['std/os',          'getCurrentDir, fileExists, walkDir, getEnv, sleep'],
+    ['std/json',        'parseJson, to[T], %*, pretty, JsonNode'],
+    ['std/strformat',   'fmt"..." interpolation, &"..." operator'],
+    ['std/times',       'now, cpuTime, epochTime, format, parse, Duration'],
+    ['std/math',        'sqrt, pow, sin, cos, floor, ceil, round, PI'],
+    ['std/random',      'randomize, rand, sample, shuffle, initRand'],
+    ['std/options',     'some, none, isSome, isNone, get, map, filter'],
+    ['std/algorithm',   'sort, sorted, binarySearch, reverse, isSorted'],
+    ['std/re',          're, match, findAll, replace, split, captures'],
+    ['std/asyncdispatch','async, await, waitFor, sleepAsync, poll'],
+    ['std/httpclient',  'newHttpClient, get, post, request, Response'],
+    ['std/sets',        'toHashSet, incl, excl, contains, union, intersection'],
+    ['std/macros',      'NimNode, newTree, quote do, repr, treeRepr'],
   ]
   const rHdr = mk('div','ref-sect-hdr')
-  rHdr.textContent = '▸ std library'
+  rHdr.textContent = '> Nim stdlib'
   rHdr.dataset.a='ref:toggle'; rHdr.dataset.sect='std'
   const rList = mk('div','ref-sect-body hidden'); rList.id='sect-std'
   STD.forEach(([mod, desc]) => {
@@ -1430,24 +1814,28 @@ function buildSnippetsPanel() {
 
   // Zig patterns
   const PATS = [
-    ['?T', 'Optional: nullable value, use orelse/if'],
-    ['!T', 'Error union: fn returns error or T'],
-    ['[]T', 'Slice: fat pointer (ptr + len)'],
-    ['[N]T', 'Array: fixed-size, stack allocated'],
-    ['[*]T', 'Many-pointer: no length info'],
-    ['[:0]u8', 'Sentinel-terminated slice (C string)'],
-    ['*T / **T', 'Single / double pointer'],
-    ['defer', 'Runs at end of scope (always)'],
-    ['errdefer', 'Runs only if function returns error'],
-    ['comptime', 'Compile-time execution context'],
-    ['inline for', 'Unrolled loop at compile time'],
-    ['union(enum)', 'Tagged union (safe sum type)'],
-    ['packed struct', 'Bit-exact memory layout'],
-    ['extern struct', 'C-compatible memory layout'],
-    ['anytype', 'Generic parameter (any type)'],
+    ['Option[T]',       'Optional value — use isSome/get or case'],
+    ['ref T',           'Heap-allocated reference type'],
+    ['ptr T',           'Unsafe pointer — manual memory'],
+    ['seq[T]',          'Dynamic array — @[], add, del, len'],
+    ['array[N, T]',     'Fixed-size stack array'],
+    ['openArray[T]',    'Untyped slice — accepts seq or array'],
+    ['varargs[T]',      'Variable number of args like printf'],
+    ['tuple[a: T, ...]','Named or anonymous tuple'],
+    ['defer: stmt',     'Runs at end of scope (like Go defer)'],
+    ['when cond:',      'Compile-time conditional (like #ifdef)'],
+    ['template',        'Inline code reuse — no overhead'],
+    ['macro',           'AST transformation at compile time'],
+    ['iterator',        'Lazy sequence generator with yield'],
+    ['converter',       'Implicit type conversion'],
+    ['concept',         'Generic constraint (like Rust traits)'],
+    ['distinct T',      'New type based on T — no implicit conv'],
+    ['object variants', 'Discriminated union (case field)'],
+    ['{.pragma.}',      'Annotate proc/type — raises, inline, etc'],
+    ['cast[T](x)',      'Bit-level reinterpret — unsafe'],
   ]
   const pHdr = mk('div','ref-sect-hdr')
-  pHdr.textContent = '▸ Zig patterns'
+  pHdr.textContent = '> Nim patterns'
   pHdr.dataset.a='ref:toggle'; pHdr.dataset.sect='pats'
   const pList = mk('div','ref-sect-body hidden'); pList.id='sect-pats'
   PATS.forEach(([name, desc]) => {
@@ -1485,7 +1873,7 @@ function buildTabBar() {
       const errBadge = errs ? `<span class="tab-err-badge">${errs}</span>` : ''
       tab.innerHTML = `<span class="ficon ${ic} small">${il}</span>
         <span class="tab-lbl">${escH(t.name)}${t.dirty?'<span class="dot"></span>':''}${errBadge}</span>
-        <button class="tab-x" data-a="tab:close" data-id="${t.id}" title="Close">✕</button>`
+        <button class="tab-x" data-a="tab:close" data-id="${t.id}" title="Close">x</button>`
       bar.appendChild(tab)
     })
   }
@@ -1504,7 +1892,7 @@ function buildEditorArea() {
   const diagByLine = {}
   tabDiags.forEach(d => { if (!diagByLine[d.line]) diagByLine[d.line]=d })
 
-  // ── Gutter ────────────────────────────────────────────────────────────────
+  // Gutter
   const gutter = mk('div','gutter'); gutter.id='gutter'
   lines.forEach((lineText, i) => {
     const lineNo = i+1
@@ -1515,113 +1903,82 @@ function buildEditorArea() {
     ln.dataset.lineNo = lineNo
     ln.addEventListener('click', function(e){
       e.stopPropagation()
-      // Click line number → select the whole line in editor
       const ta = document.getElementById('editor-ta')
       if (!ta) return
-      const v = ta.value, lines = v.split('\n')
+      const v = ta.value, ls = v.split('\n')
       let pos = 0
-      for (let j = 0; j < lineNo-1; j++) pos += lines[j].length + 1
-      const end = pos + (lines[lineNo-1]||'').length
+      for (let j = 0; j < lineNo-1; j++) pos += ls[j].length + 1
+      const end = pos + (ls[lineNo-1]||'').length
       ta.focus(); ta.setSelectionRange(pos, end)
     })
-    if (/{$/.test(lineText.trimEnd()) || /^(pub fn|fn |struct |enum |test |comptime )/.test(lineText.trim())) {
-      ln.classList.add('foldable')
-      ln.dataset.foldLine = lineNo
-    }
     gutter.appendChild(ln)
   })
 
-  // ── Highlight layer ───────────────────────────────────────────────────────
+  // Highlight layer — position:absolute, transform-synced to textarea scroll
   const hl = mk('div','hl'); hl.id='hl'
-  hl.innerHTML = tab.lang==='zig'
-    ? hlCodeWithDiags(tab.content, diagByLine)
-    : lines.map(l=>'<div class="cl">'+escH(l)+'</div>').join('')
+  if (lines.length > 500) {
+    const frag = document.createDocumentFragment()
+    for (let i = 0; i < lines.length; i++) {
+      const d = document.createElement('div')
+      d.className = 'cl'
+      d.textContent = lines[i] || ' '
+      frag.appendChild(d)
+    }
+    hl.appendChild(frag)
+  } else {
+    hl.innerHTML = tab.lang==='nim'
+      ? hlCodeWithDiags(tab.content, diagByLine)
+      : lines.map(l=>'<div class="cl">'+escH(l)+'</div>').join('')
+  }
 
-  // ── Squiggle overlay ──────────────────────────────────────────────────────
+  // Squiggle layer
   const sq = mk('div','squiggle-layer'); sq.id='sq'
   tabDiags.forEach(d => {
     const lineText = lines[d.line-1]||''
     const colStart = Math.max(0, d.col-1)
     const CW = 7.825
     const left = 16 + colStart*CW
-    const width = Math.max(CW*3, (lineText.length - colStart)*CW)
+    const width = Math.max(CW*3, (lineText.length-colStart)*CW)
     const top = 12 + (d.line-1)*22 + 19
-    const s = mk('div', 'sq sq-'+d.kind)
+    const s = mk('div','sq sq-'+d.kind)
     s.style.cssText = 'left:'+left+'px;top:'+top+'px;width:'+Math.min(width,900)+'px'
     s.title = d.kind+': '+d.message
     sq.appendChild(s)
   })
 
-  // ── Current line highlight ────────────────────────────────────────────────
+  // Current line highlight
   const curLine = mk('div','cur-line-hl'); curLine.id='cur-line-hl'
   curLine.style.top = '12px'
 
-  // ── Textarea — NO overflow, sized to content ──────────────────────────────
+  // Textarea — the ONLY scroll container. Fills code-pane completely.
+  // hl/sq are absolutely positioned siblings that move via CSS transform
+  // in onEditorScroll to stay aligned with the scrolled text.
   const ta = document.createElement('textarea')
   ta.id='editor-ta'; ta.value=tab.content
   ta.spellcheck=false; ta.autocomplete='off'
   ta.setAttribute('autocorrect','off'); ta.setAttribute('autocapitalize','off')
   ta.addEventListener('input',   onEditorInput)
   ta.addEventListener('keydown', onEditorKey)
+  ta.addEventListener('scroll',  onEditorScroll)
   ta.addEventListener('click',   onEditorClick)
   ta.addEventListener('keyup',   onEditorClick)
-  // NO scroll listener — code-pane scrolls, not textarea
 
-  // ── editor-inner: shared positioning context for all layers ──────────────
-  // All children are absolutely positioned inside it.
-  // It grows to fit the hl content, which makes code-pane scroll correctly.
-  const inner = mk('div','editor-inner'); inner.id='editor-inner'
-  inner.append(curLine, hl, sq, ta)
-
-  // ── Code pane is the scroll container ────────────────────────────────────
+  // code-pane: overflow:hidden, clips the hl/sq layers
   const pane = mk('div','code-pane'); pane.id='code-pane'
-  pane.addEventListener('scroll', onPaneScroll)
-  pane.appendChild(inner)
+  pane.append(curLine, hl, sq, ta)
 
   area.append(gutter, pane)
-
-  // Let hl render fully before measuring (two frames = safe on all GPUs)
-  requestAnimationFrame(function() {
-    requestAnimationFrame(function() { resizeTextarea(tab) })
-  })
   return area
 }
 
-// Sync gutter scrollTop when code-pane scrolls (gutter is separate from pane)
-function onPaneScroll() {
-  const pane = document.getElementById('code-pane')
-  const gu   = document.getElementById('gutter')
-  if (pane && gu) gu.scrollTop = pane.scrollTop
-  updateMinimap()
-}
 
-// Resize textarea to exactly match the hl layer dimensions so the caret
-// position aligns with the syntax-highlighted text at all zoom levels.
-function resizeTextarea(tab) {
-  const hl    = document.getElementById('hl')
-  const ta    = document.getElementById('editor-ta')
-  const inner = document.getElementById('editor-inner')
-  if (!hl || !ta || !inner) return
+// updateMinimapViewport defined in onEditorScroll section
 
-  const content = tab?.content || (document.getElementById('editor-ta')?.value || '')
-  const lineCount = content.split('\n').length
-  const fallbackH = lineCount * 22 + 24
+let _lastResizeH = 0, _lastResizeW = 0
 
-  // Prefer actual scrollHeight once hl has rendered content
-  const hlH = hl.scrollHeight > 24 ? hl.scrollHeight : fallbackH
-  // For width: find the longest line and estimate its pixel width
-  const longestLine = content.split('\n').reduce((a, l) => Math.max(a, l.length), 0)
-  const estW = longestLine * 7.5 + 48
-  const hlW  = hl.scrollWidth > 100 ? hl.scrollWidth : Math.max(estW, 600)
-
-  // inner div must be at least as tall/wide as content for pane to scroll
-  inner.style.minHeight = hlH + 'px'
-  inner.style.minWidth  = hlW + 'px'
-
-  // textarea fills the inner div so the caret never runs out of space
-  ta.style.width  = hlW + 'px'
-  ta.style.height = hlH + 'px'
-}
+// resizeTextarea is a no-op — textarea fills pane via CSS (width:100% height:100%)
+// and scrolls natively. hl/sq are synchronized via CSS transform in onEditorScroll.
+function resizeTextarea() {}
 
 function hlCodeWithDiags(code, diagByLine) {
   const lines = code.split('\n')
@@ -1630,7 +1987,7 @@ function hlCodeWithDiags(code, diagByLine) {
     const [html, newDepth] = hlLine(line, depth)
     depth = newDepth
     const d = diagByLine[i+1]
-    const ghost = d ? `<span class="inline-err ie-${d.kind}" title="${escH(d.message)}"> ← ${escH(d.message)}</span>` : ''
+    const ghost = d ? `<span class="inline-err ie-${d.kind}" title="${escH(d.message)}"> <- ${escH(d.message)}</span>` : ''
     return `<div class="cl">${html}${ghost}</div>`
   }).join('')
 }
@@ -1643,17 +2000,17 @@ function buildWelcome() {
       <path d="M36 4L8 19v34l28 15 28-15V19z" fill="#f97316" opacity=".1"/>
       <path d="M36 4L8 19v34l28 15 28-15V19z" stroke="#f97316" stroke-width="2"/>
       <path d="M36 4v66M8 19l28 15 28-15" stroke="#f97316" stroke-width="1" opacity=".3"/>
-      <text x="36" y="45" text-anchor="middle" font-size="16" font-family="'Geist Mono',monospace" fill="#f97316" font-weight="700">Fe</text>
+      <text x="36" y="45" text-anchor="middle" font-size="16" font-family="'Geist Mono',monospace" fill="#f97316" font-weight="700">Fs</text>
     </svg>
     <h1 class="wlc-h1">Ferrum Studio</h1>
-    <p class="wlc-sub">The professional IDE built exclusively for Zig</p>
+    <p class="wlc-sub">The professional IDE built exclusively for Nim</p>
     <div class="wlc-btns">
-      <button class="wbtn primary" data-a="open:folder">📂 Open Folder</button>
+      <button class="wbtn primary" data-a="open:folder">Open Folder</button>
       <button class="wbtn" data-a="file:new">＋ New File</button>
-      <button class="wbtn" data-a="open:file">📄 Open File</button>
-      <button class="wbtn" data-a="scaffold:open">⬡ New Zig Project</button>
-      <button class="wbtn" data-a="template:open">🧩 From Template</button>
-      <button class="wbtn" data-a="do:quickopen">⚡ Quick Open</button>
+      <button class="wbtn" data-a="open:file">Open File</button>
+      <button class="wbtn" data-a="scaffold:open">New Nim Project</button>
+      <button class="wbtn" data-a="template:open">From Template</button>
+      <button class="wbtn" data-a="do:quickopen">Quick Open</button>
     </div>
     ${recentFiles.length ? `
     <div class="wlc-recent">
@@ -1663,8 +2020,8 @@ function buildWelcome() {
     <div class="wlc-features">
       <div class="wlc-feat"><span class="feat-key">F5</span><span>Run file</span></div>
       <div class="wlc-feat"><span class="feat-key">F6</span><span>Run with args</span></div>
-      <div class="wlc-feat"><span class="feat-key">F7</span><span>zig build</span></div>
-      <div class="wlc-feat"><span class="feat-key">F8</span><span>zig test</span></div>
+      <div class="wlc-feat"><span class="feat-key">F7</span><span>nimble build</span></div>
+      <div class="wlc-feat"><span class="feat-key">F8</span><span>nimble test</span></div>
       <div class="wlc-feat"><span class="feat-key">Ctrl+S</span><span>Save & Check</span></div>
       <div class="wlc-feat"><span class="feat-key">Ctrl+P</span><span>Quick Open</span></div>
       <div class="wlc-feat"><span class="feat-key">Ctrl+F</span><span>Find in file</span></div>
@@ -1701,13 +2058,13 @@ function buildBottomPanel() {
       </svg> Terminal
     </div>
     <div class="panel-tab ${S.activePanel==='problems'?'active':''}" id="tab-problems" data-a="panel:problems">
-      ⚠ Problems<span id="prob-badge" class="prob-bdg hidden"></span>
+      ! Problems<span id="prob-badge" class="prob-bdg hidden"></span>
     </div>
     <div class="panel-tab ${S.activePanel==='tests'?'active':''}" id="tab-tests" data-a="panel:tests">
-      ✦ Tests<span id="test-badge" class="prob-bdg hidden"></span>
+      Tests<span id="test-badge" class="prob-bdg hidden"></span>
     </div>
     <div class="panel-tab ${S.activePanel==='build'?'active':''}" data-a="panel:build">
-      ⚙ Build Output
+      Build Output
     </div>
     <div class="term-spacer"></div>
     <button class="icon-btn" data-a="term:clear" title="Clear">⌫</button>
@@ -1719,10 +2076,10 @@ function buildBottomPanel() {
   if (S.activePanel !== 'terminal') termBody.classList.add('hidden')
   const out = mk('div','term-out'); out.id='term-out'
   const inRow = mk('div','term-in-row')
-  const ps = mkt('span','term-ps','➜'); ps.id='term-ps'
+  const ps = mkt('span','term-ps','>'); ps.id='term-ps'
   const inp = document.createElement('input')
   inp.type='text'; inp.id='term-in'; inp.autocomplete='off'; inp.spellcheck=false
-  inp.placeholder='zig run src/main.zig -- ./mydir   |   type help'
+  inp.placeholder='nim r src/main.nim   |   type help'
   inp.addEventListener('keydown', onTermKey)
   out.addEventListener('click', () => inp.focus())
   inRow.append(ps, inp)
@@ -1778,7 +2135,7 @@ function updateProblems(list) {
   updateDiagStatus(errs, warns)
 
   if (!all.length) {
-    list.innerHTML = '<div class="prob-empty">✓ No problems detected</div>'
+    list.innerHTML = '<div class="prob-empty">OK No problems detected</div>'
     return
   }
 
@@ -1821,7 +2178,7 @@ function updateProblems(list) {
 function buildTestsContent() {
   const wrap = mk('div','tests-wrap')
   const hdr = mk('div','tests-toolbar')
-  const runBtn = mkt('button','wbtn small','✦ Run Tests')
+  const runBtn = mkt('button','wbtn small','+ Run Tests')
   runBtn.dataset.a = 'z:test'
   hdr.appendChild(runBtn)
   wrap.appendChild(hdr)
@@ -1848,14 +2205,14 @@ function renderTestResults(list) {
   list.innerHTML = ''
   const summary = mk('div','test-summary')
   summary.innerHTML = `
-    <span class="ts-pass">✓ ${passed} passed</span>
-    ${failed?`<span class="ts-fail">✕ ${failed} failed</span>`:''}
+    <span class="ts-pass">OK ${passed} passed</span>
+    ${failed?`<span class="ts-fail">x ${failed} failed</span>`:''}
     <span class="ts-total">${S.testResults.length} total</span>`
   list.appendChild(summary)
   S.testResults.forEach(t => {
     const row = mk('div', `test-row ${t.status}`)
     row.innerHTML = `
-      <span class="test-icon">${t.status==='pass'?'✓':'✕'}</span>
+      <span class="test-icon">${t.status==='pass'?'OK':'x'}</span>
       <span class="test-name">${escH(t.name)}</span>
       ${t.output?`<pre class="test-output">${escH(t.output)}</pre>`:''}`
     list.appendChild(row)
@@ -1867,24 +2224,24 @@ function buildStatusBar() {
   const bar = mk('div','status-bar')
   bar.innerHTML = `
     <div id="sb-l">
-      <span id="sb-branch">⎇ ${S.gitStatus.branch||'main'}</span>
-      <span id="sb-run-ind" class="hidden">⟳ running</span>
+      <span id="sb-branch">branch: ${S.gitStatus.branch||'main'}</span>
+      <span id="sb-run-ind" class="hidden">running</span>
     </div>
     <div id="sb-r">
       <span id="sb-diag-err" class="sb-diag sb-err hidden"></span>
       <span id="sb-diag-warn" class="sb-diag sb-warn hidden"></span>
       <span id="sb-pos">Ln 1, Col 1</span>
-      <span id="sb-lang">Zig</span>
+      <span id="sb-lang">Nim</span>
       <span id="sb-enc">UTF-8</span>
-      <span id="sb-zig" title="Zig path">zig ${S.zigInfo.version}</span>
+      <span id="nim-badge" style="cursor:pointer" title="Nim version">nim ${S.nimInfo.version}</span>
     </div>`
   return bar
 }
 
 function updateDiagStatus(errs, warns) {
   const ee = $('#sb-diag-err'), ew = $('#sb-diag-warn')
-  if (ee) { if(errs){ee.textContent=`✕ ${errs}`;ee.classList.remove('hidden')}else ee.classList.add('hidden') }
-  if (ew) { if(warns){ew.textContent=`⚠ ${warns}`;ew.classList.remove('hidden')}else ew.classList.add('hidden') }
+  if (ee) { if(errs){ee.textContent=`x ${errs}`;ee.classList.remove('hidden')}else ee.classList.add('hidden') }
+  if (ew) { if(warns){ew.textContent=`! ${warns}`;ew.classList.remove('hidden')}else ew.classList.add('hidden') }
 }
 
 // ── Dialogs ───────────────────────────────────────────────────────────────────
@@ -1895,13 +2252,13 @@ function buildArgsDialog() {
     <div class="dlg-body">
       <div class="dlg-hint">Arguments passed after <code>--</code> to your program</div>
       <div class="dlg-row">
-        <span class="dlg-pre" id="args-prefix">zig run &lt;file&gt; -- </span>
+        <span class="dlg-pre" id="args-prefix">nim r &lt;file&gt; </span>
         <input id="args-in" class="dlg-input" type="text" placeholder="./mydir  or  arg1 arg2" autocomplete="off"/>
       </div>
     </div>
     <div class="dlg-footer">
       <button class="wbtn" data-a="dlg:cancel">Cancel</button>
-      <button class="wbtn primary" data-a="dlg:run">▶ Run</button>
+      <button class="wbtn primary" data-a="dlg:run">Run</button>
     </div>
   </div>`
   return dlg
@@ -1914,7 +2271,7 @@ function buildNewItemDialog() {
     <div class="dlg-body">
       <div class="dlg-row">
         <span class="dlg-pre">Name:</span>
-        <input id="newitem-in" class="dlg-input" type="text" placeholder="main.zig" autocomplete="off"/>
+        <input id="newitem-in" class="dlg-input" type="text" placeholder="main.nim" autocomplete="off"/>
       </div>
     </div>
     <div class="dlg-footer">
@@ -1928,9 +2285,9 @@ function buildNewItemDialog() {
 function buildScaffoldDialog() {
   const dlg = mk('div','dialog-bg hidden'); dlg.id='scaffold-dlg'
   dlg.innerHTML = `<div class="dialog">
-    <div class="dlg-title">New Zig Project</div>
+    <div class="dlg-title">New Nim Project</div>
     <div class="dlg-body">
-      <div class="dlg-hint">Creates a new Zig project using <code>zig init</code></div>
+      <div class="dlg-hint">Creates a new Nim project using <code>nimble init</code></div>
       <div class="dlg-row">
         <span class="dlg-pre">Directory:</span>
         <input id="scaffold-dir" class="dlg-input" type="text" placeholder="/home/user/my-project" autocomplete="off"/>
@@ -1938,7 +2295,7 @@ function buildScaffoldDialog() {
     </div>
     <div class="dlg-footer">
       <button class="wbtn" data-a="scaffold:cancel">Cancel</button>
-      <button class="wbtn primary" data-a="scaffold:create">⬡ Create</button>
+      <button class="wbtn primary" data-a="scaffold:create">Create</button>
     </div>
   </div>`
   return dlg
@@ -1972,7 +2329,7 @@ function wireAll() {
   })
 
   // Wails events
-  wOn('zig:out',   data => tPrint(data))
+  wOn('nim:out',   data => tPrint(data))
 
   // Listen for template application from enhancements.js
   window.addEventListener('ferrum:template-applied', async e => {
@@ -1981,14 +2338,14 @@ function wireAll() {
     S.tree = await go('GetFileTree', root)
     reRenderSidebar()
     // Open the first .zig file
-    const mainFile = files.find(f => f.name.endsWith('.zig'))
+    const mainFile = files.find(f => f.name.endsWith('.nim'))
     if (mainFile) {
-      await addTab(mainFile.path, mainFile.name, mainFile.content, 'zig')
+      await addTab(mainFile.path, mainFile.name, mainFile.content, 'nim')
     }
     tLine('Template applied! Files created in ' + root, '#4ade80')
   })
-  wOn('zig:done',  code => onZigDone(code))
-  wOn('zig:diags', diags => applyDiags(diags))
+  wOn('nim:done',  code => onNimDone(code))
+  wOn('nim:diags', diags => applyDiags(diags))
   wOn('test:results', results => applyTestResults(results))
 }
 
@@ -2063,7 +2420,7 @@ function dispatch(a, el, e) {
     case 'find:close':      closeFind(); break
     case 'find:next':       findStep(1); break
     case 'find:prev':       findStep(-1); break
-    case 'ref:toggle':    { const s=$('#sect-'+el.dataset.sect); if(s){const open=!s.classList.contains('hidden');s.classList.toggle('hidden',open);el.textContent=(open?'▸':'▾')+el.textContent.slice(1)} break }
+    case 'ref:toggle':    { const s=$('#sect-'+el.dataset.sect); if(s){const open=!s.classList.contains('hidden');s.classList.toggle('hidden',open);el.textContent=(open?'>':'v')+el.textContent.slice(1)} break }
     case 'snip:insert':   { const [t,,body]=SNIPPETS.find(([t])=>t===el.dataset.snip)||[]; if(body){const ta=$('#editor-ta');if(ta){const {selectionStart:s,selectionEnd:en,value:v}=ta;const c0=body.indexOf('$0');const bef=c0>=0?body.slice(0,c0).replace(/\$\d/g,''):'';const exp=body.replace(/\$\d/g,'');ta.value=v.slice(0,s)+exp+v.slice(en);ta.selectionStart=ta.selectionEnd=s+bef.length;ta.dispatchEvent(new Event('input'));ta.focus()}} break }
     case 'build:step':    { const step=el.dataset.name||el.closest('[data-name]')?.dataset?.name; if(step) runBuildStep(step); break }
     case 'build:refresh': go('GetBuildSteps').then(s=>{if(s)S.buildSteps=s;renderBuildPanel()}); break
@@ -2084,7 +2441,7 @@ function dispatch(a, el, e) {
       ['New File         Ctrl+N',    'file:new'],
       ['Open File        Ctrl+O',    'open:file'],
       ['Open Folder',                'open:folder'],
-      ['New Zig Project', 'scaffold:open'],
+      ['New Nim Project', 'scaffold:open'],
       ['New from Template…', 'template:open'],
       null,
       ['Save             Ctrl+S',    'do:save'],
@@ -2109,17 +2466,15 @@ function dispatch(a, el, e) {
       null,
       ['Stop process',               'z:kill'],
     ]); break
-    case 'm:zig': showMenu(el,[
-      ['zig build',                  'zig:build'],
-      ['zig build-exe',              'zig:build-exe'],
-      ['zig build-lib',              'zig:build-lib'],
-      ['zig init (new project)',     'scaffold:open'],
+    case 'm:nim': showMenu(el,[
+      ['nimble build',                  'nim:build'],
+      ['nim c -d:release <file>',     'nim:build-exe'],
+      ['nim c --app:lib <file>',      'nim:build-lib'],
+      ['nimble init (new project)',     'scaffold:open'],
       null,
-      ['zig env',                    'zig:env'],
-      ['zig targets',                'zig:targets'],
-      ['zig version',                'zig:version'],
-      null,
-      ['Show zig path',              'zig:which'],
+      ['nim dump',                    'nim:env'],
+      ['nim --listsyntaxonly',                'nim:targets'],
+      ['nim --version',              'nim:version'],
     ]); break
     case 'm:view': showMenu(el,[
       ['Terminal',         'panel:terminal'],
@@ -2135,13 +2490,13 @@ function dispatch(a, el, e) {
     case 'do:wordwrap': toggleWordWrap(); break
     case 'do:gotoline': openGotoLine(); break
     case 'settings:open': $$('.act-btn').forEach(b=>b.classList.remove('active')); document.querySelector('[data-pnl="settings"]')?.classList.add('active'); $$('.sb-panel').forEach(p=>p.classList.toggle('hidden',p.id!=='pnl-settings')); break
-    case 'zig:build':    runZig('build'); break
-    case 'zig:build-exe':{ const t=activeTab(); if(t?.path)runZig(`build-exe ${t.path}`); break }
-    case 'zig:build-lib':{ const t=activeTab(); if(t?.path)runZig(`build-lib ${t.path}`); break }
-    case 'zig:env':      runZig('env'); break
-    case 'zig:targets':  runZig('targets'); break
-    case 'zig:version':  go('ZigVersion').then(v=>tPrint((v||'?')+'\n')); break
-    case 'zig:which':    tPrint('zig: '+S.zigInfo.path+'\n'); break
+    case 'nim:build':    runNim('nimble build'); break
+    case 'nim:build-exe':{ const t=activeTab(); if(t?.path)runNim(`c -d:release ${t.path}`); break }
+    case 'nim:build-lib':{ const t=activeTab(); if(t?.path)runNim(`c --app:lib ${t.path}`); break }
+    case 'nim:env':      runNim('dump'); break
+    case 'nim:targets':  runNim('--listsyntaxonly'); break
+    case 'nim:version':  go('NimVersion').then(v=>tPrint((v||'?')+'\n')); break
+    case 'nim:which':    tPrint('nim: '+S.nimInfo.path+'\n'); break
   }
 }
 
@@ -2154,23 +2509,30 @@ function onEditorInput(e) {
   updateCursorPos(ta)
   updateTabDot(tab.id)
 
-  // Debounced highlight + gutter + textarea resize
+  // Debounced highlight: 50ms for small files, 80ms for large ones
   clearTimeout(S._hlTimer)
+  const hlDelay = tab.content.length > 30000 ? 80 : 50
   S._hlTimer = setTimeout(function() {
     redrawHL()
     var lc = tab.content.split('\n').length
-    if (lc !== S._lastLineCount) { S._lastLineCount = lc; redrawGutter() }
-    // Resize textarea so code-pane scrolls to fit new content
-    resizeTextarea(tab)
-  }, 50)
+    if (lc !== S._lastLineCount) {
+      S._lastLineCount = lc
+      redrawGutter()
+          }
+  }, hlDelay)
 
   clearTimeout(S._acTimer)
   S._acTimer = setTimeout(function() { acUpdate(ta) }, 180)
 
   if (tab.path) {
     clearTimeout(S.checkTimer)
-    S.checkTimer = setTimeout(function() { autoCheck(tab) }, 2500)
+    // Larger files get a longer debounce to avoid hammering zig ast-check
+    const checkDelay = tab.content.length > 50000 ? 4000 : 2500
+    S.checkTimer = setTimeout(function() { autoCheck(tab) }, checkDelay)
   }
+  // Minimap full redraw at low priority — 400ms debounce, doesn't block typing
+  clearTimeout(S._mmTimer)
+  S._mmTimer = setTimeout(updateMinimap, 400)
 }
 
 function updateCursorPos(ta) {
@@ -2228,7 +2590,7 @@ function highlightMatchingBracket(ta) {
   function lineColOf(p) {
     const before = v.slice(0, p)
     const ln = (before.match(/\n/g) || []).length
-    const col = p - before.lastIndexOf('') - 1
+    const col = p - before.lastIndexOf('\n') - 1
     return { ln, col }
   }
   function markBracket(p) {
@@ -2252,7 +2614,7 @@ async function autoCheck(tab) {
     tab.dirty = false; updateTabDot(tab.id)
   }
   // Run check — yields to browser between save and check
-  const diags = await go('ZigCheck', tab.path)
+  const diags = await go('NimCheck', tab.path)
   if (!diags) return
   // Apply in a microtask so any pending keystrokes paint first
   setTimeout(() => applyDiags(diags), 0)
@@ -2373,9 +2735,43 @@ function onEditorKey(e) {
   if ((e.ctrlKey||e.metaKey)&&e.key==='/')  { e.preventDefault(); toggleComment(); return }
 }
 
-// onEditorScroll is kept for compatibility but the textarea no longer scrolls.
-// Scrolling is handled by code-pane (onPaneScroll).
-function onEditorScroll() {}
+function onEditorScroll(e) {
+  const ta = e.target
+  const t = ta.scrollTop
+  const l = ta.scrollLeft
+  // Move hl and sq layers to track textarea scroll position.
+  // We cannot use scrollTop on these elements because they are
+  // position:absolute inside overflow:hidden — it silently does nothing.
+  // CSS transform is the only way to move them.
+  const tx = 'translate('+(-l)+'px,'+(-t)+'px)'
+  const hl = document.getElementById('hl')
+  const sq = document.getElementById('sq')
+  const cl = document.getElementById('cur-line-hl')
+  if (hl) hl.style.transform = tx
+  if (sq) sq.style.transform = tx
+  if (cl) cl.style.transform = 'translateY('+(-t)+'px)'
+  // Sync gutter vertical scroll
+  const gu = document.getElementById('gutter')
+  if (gu) gu.scrollTop = t
+  // Minimap viewport indicator
+  _mmScrollRaf && cancelAnimationFrame(_mmScrollRaf)
+  _mmScrollRaf = requestAnimationFrame(updateMinimapViewport)
+}
+let _mmScrollRaf = 0
+
+function updateMinimapViewport() {
+  const ta = document.getElementById('editor-ta')
+  const vp = document.getElementById('minimap-vp')
+  const mm = document.getElementById('minimap')
+  if (!ta || !vp || !mm) return
+  const mmH = mm.clientHeight || 400
+  if (ta.scrollHeight > ta.clientHeight) {
+    const frac = ta.scrollTop / ta.scrollHeight
+    const vpH  = (ta.clientHeight / ta.scrollHeight) * mmH
+    vp.style.top    = (frac * mmH) + 'px'
+    vp.style.height = vpH + 'px'
+  }
+}
 
 function onEditorClick(e) {
   const ta = e.target?.id === 'editor-ta' ? e.target : $('#editor-ta')
@@ -2387,7 +2783,7 @@ function onEditorClick(e) {
 const _lineCache = []
 
 function redrawHL() {
-  updateMinimap()
+  // Minimap is cheap-debounced separately — don't call it on every keystroke
   const hl = document.getElementById('hl')
   const tab = activeTab()
   if (!hl || !tab) return
@@ -2397,7 +2793,7 @@ function redrawHL() {
   tabDiags.forEach(d => { if (!diagByLine[d.line]) diagByLine[d.line] = d })
 
   const lines = tab.content.split('\n')
-  const isZig = tab.lang === 'zig'
+  const isZig = tab.lang === 'nim'
   const existingNodes = hl.children
 
   // Add missing line div nodes
@@ -2436,7 +2832,7 @@ function redrawHL() {
       const cacheKey = lines[i] + '|' + (diag ? diag.kind + diag.message : '')
       const [html, newDepth] = hlLine(lines[i], depth)
       const ghost = diag
-        ? '<span class="inline-err ie-' + diag.kind + '" title="' + escH(diag.message) + '"> ← ' + escH(diag.message) + '</span>'
+        ? '<span class="inline-err ie-' + diag.kind + '" title="' + escH(diag.message) + '"> <- ' + escH(diag.message) + '</span>'
         : ''
       const el = existingNodes[i]
       const newHTML = html + ghost
@@ -2519,11 +2915,9 @@ function toggleWordWrap() {
   _wordWrap = !_wordWrap
   const ta    = document.getElementById('editor-ta')
   const hl    = document.getElementById('hl')
-  const inner = document.getElementById('editor-inner')
   const pane  = document.getElementById('code-pane')
   if (ta) ta.style.whiteSpace    = _wordWrap ? 'pre-wrap' : 'pre'
   if (hl) hl.style.whiteSpace    = _wordWrap ? 'pre-wrap' : 'pre'
-  if (inner) inner.style.minWidth = _wordWrap ? '0' : ''
   if (pane) pane.style.overflowX  = _wordWrap ? 'hidden' : 'auto'
   tLine((_wordWrap ? 'Word wrap ON' : 'Word wrap OFF') + '  (Ctrl+Shift+W)', '#60a5fa')
 }
@@ -2538,12 +2932,12 @@ function toggleComment() {
   const trimmed = line.trimStart()
   const indent = line.slice(0,line.length-trimmed.length)
   let newLine, offset
-  if (trimmed.startsWith('// ')) {
-    newLine = indent+trimmed.slice(3); offset=-3
-  } else if (trimmed.startsWith('//')) {
+  if (trimmed.startsWith('# ')) {
     newLine = indent+trimmed.slice(2); offset=-2
+  } else if (trimmed.startsWith('#')) {
+    newLine = indent+trimmed.slice(1); offset=-1
   } else {
-    newLine = indent+'// '+trimmed; offset=3
+    newLine = indent+'# '+trimmed; offset=2
   }
   ta.value = v.slice(0,lineStart)+newLine+v.slice(end)
   ta.selectionStart = Math.max(lineStart, s+offset)
@@ -2568,7 +2962,8 @@ function selectNext(ta) {
 
 function scrollToLine(ta, pos) {
   const line = ta.value.slice(0,pos).split('\n').length-1
-  ta.scrollTop = Math.max(0,(line-5)*22)
+  const scroller = document.getElementById('editor-ta') || ta
+  scroller.scrollTop = Math.max(0,(line-5)*22)
 }
 
 // ── Terminal ──────────────────────────────────────────────────────────────────
@@ -2641,24 +3036,24 @@ function switchPanel(which) {
 }
 
 const _ts = {}
-function runZig(argsStr) {
+function runNim(argsStr) {
   if (S.running) { tLine('Already running. Press Ctrl+C or Stop.','#fbbf24'); return }
   setRunning(true)
   _ts.t = Date.now()
-  tLine('\n$ zig '+argsStr.trim(), '#60a5fa')
+  tLine('\n$ nim '+argsStr.trim(), '#60a5fa')
   switchPanel('terminal')
-  go('RunZig', argsStr.trim())
+  go('RunNim', argsStr.trim())
 }
 
 function runBuildStep(name) {
-  tLine(`\n$ zig build ${name}`, '#60a5fa')
+  tLine(`\n$ nim build ${name}`, '#60a5fa')
   switchPanel('build')
-  go('RunZig', `build ${name}`)
+  go('RunNim', `build ${name}`)
   setRunning(true)
   _ts.t = Date.now()
 }
 
-function onZigDone(code) {
+function onNimDone(code) {
   setRunning(false)
   // Parse GPA leak output from accumulated terminal output
   const termEl = document.getElementById('term-out')
@@ -2667,145 +3062,145 @@ function onZigDone(code) {
     const leaks = parseLeaks(termText)
     if (leaks.length) {
       applyDiags(leaks, 'GPA')
-      tLine('⚠ GPA detected ' + leaks.length + ' memory leak(s) — see Problems panel', '#fbbf24')
+      tLine('GPA detected ' + leaks.length + ' memory leak(s) — see Problems panel', '#fbbf24')
       switchPanel('problems')
     }
   }
   const elapsed = _ts.t ? ` (${((Date.now()-_ts.t)/1000).toFixed(2)}s)` : ''
-  tLine(code===0 ? `─── ✓ exit 0${elapsed} ───` : `─── ✕ exit ${code}${elapsed} ───`,
+  tLine(code===0 ? `─── OK exit 0${elapsed} ───` : `─── x exit ${code}${elapsed} ───`,
         code===0 ? '#4ade80' : '#f87171')
   tLine('')
   // Refresh git status after build
   go('GetGitStatus').then(gs => { if(gs) { S.gitStatus=gs; updateGitUI() } })
 }
 
-function updateZigBadge(info) {
-  const b = $('#zig-badge')
+function updateNimBadge(info) {
+  const b = $('#nim-badge')
   const p = $('#plat-badge')
   const notFound = !info?.version || info.version === 'not found'
   if (b) {
-    b.textContent = notFound ? '⚠ zig not found' : 'zig ' + info.version
+    b.textContent = notFound ? 'nim not found' : 'nim ' + info.version
     b.style.color = notFound ? 'var(--red)' : ''
     b.style.cursor = 'pointer'
     b.title = notFound
-      ? 'Zig not found — click to locate or retry detection'
-      : 'zig at ' + (info.path || 'zig') + ' — click to change'
-    b.onclick = () => showZigSetup()
+      ? 'Nim not found — click to locate or retry detection'
+      : 'nim at ' + (info.path || 'nim') + ' — click to change'
+    b.onclick = () => showNimSetup()
   }
   if (p) p.textContent = (info?.os || '') + '/' + (info?.arch || '')
-  S.zigInfo = info || S.zigInfo
-  if (notFound) showZigBanner()
+  S.nimInfo = info || S.nimInfo
+  if (notFound) showNimBanner()
 }
 
-function showZigBanner() {
+function showNimBanner() {
   // Show a dismissible banner at top of editor if zig is not found
-  if ($('#zig-banner')) return // already shown
-  const banner = mk('div', 'zig-banner')
-  banner.id = 'zig-banner'
+  if ($('#nim-banner')) return // already shown
+  const banner = mk('div', 'nim-banner')
+  banner.id = 'nim-banner'
   banner.innerHTML =
-    '<span class="zig-banner-msg">⚠ Zig not found on PATH. ' +
-    'If you just installed Zig, click <strong>Retry Detection</strong> ' +
+    '<span class="nim-banner-msg">Nim not found on PATH. ' +
+    'If you just installed Nim, click <strong>Retry Detection</strong> ' +
     'or <strong>Browse…</strong> to locate it manually.</span>' +
-    '<button class="zig-banner-btn" id="zig-retry-btn">↻ Retry Detection</button>' +
-    '<button class="zig-banner-btn" id="zig-browse-btn">📂 Browse…</button>' +
-    '<button class="zig-banner-close" id="zig-banner-close">✕</button>'
+    '<button class="nim-banner-btn" id="nim-retry-btn">R Retry Detection</button>' +
+    '<button class="nim-banner-btn" id="nim-browse-btn">Browse...</button>' +
+    '<button class="nim-banner-close" id="nim-banner-close">x</button>'
   // Insert before editor area
   const col = document.querySelector('.editor-col')
   const tabBar = $('#tab-bar')
   if (col && tabBar) col.insertBefore(banner, tabBar)
 
-  document.getElementById('zig-retry-btn')?.addEventListener('click', async () => {
-    const info = await go('RetryZigDetection')
+  document.getElementById('nim-retry-btn')?.addEventListener('click', async () => {
+    const info = await go('RetryNimDetection')
     if (info && info.version !== 'not found') {
-      $('#zig-banner')?.remove()
-      updateZigBadge(info)
-      tLine('✓ Zig found: ' + info.version + ' at ' + info.path, '#4ade80')
+      $('#nim-banner')?.remove()
+      updateNimBadge(info)
+      tLine('Nim found: ' + info.version + ' at ' + info.path, '#4ade80')
     } else {
-      tLine('Still not found. Try Browse… to locate zig.exe manually.', '#f87171')
+      tLine('Still not found. Try Browse… to locate nim manually.', '#f87171')
     }
   })
-  document.getElementById('zig-browse-btn')?.addEventListener('click', async () => {
-    const ver = await go('BrowseForZig')
+  document.getElementById('nim-browse-btn')?.addEventListener('click', async () => {
+    const ver = await go('BrowseForNim')
     if (ver && !ver.startsWith('not') && !ver.startsWith('empty') && !ver.startsWith('error')) {
-      $('#zig-banner')?.remove()
-      const info = await go('GetZigInfo')
-      updateZigBadge(info)
-      tLine('✓ Zig configured: ' + ver + ' at ' + S.zigInfo.path, '#4ade80')
+      $('#nim-banner')?.remove()
+      const info = await go('GetNimInfo')
+      updateNimBadge(info)
+      tLine('Nim configured: ' + ver + ' at ' + S.nimInfo.path, '#4ade80')
     } else if (ver) {
       tLine('Error: ' + ver, '#f87171')
     }
   })
-  document.getElementById('zig-banner-close')?.addEventListener('click', () => {
-    $('#zig-banner')?.remove()
+  document.getElementById('nim-banner-close')?.addEventListener('click', () => {
+    $('#nim-banner')?.remove()
   })
 }
 
-function showZigSetup() {
+function showNimSetup() {
   // Inline settings — show current path and offer retry/browse
-  const current = S.zigInfo?.path || 'not found'
-  const ver = S.zigInfo?.version || 'not found'
+  const current = S.nimInfo?.path || 'not found'
+  const ver = S.nimInfo?.version || 'not found'
 
   const dlg = mk('div', 'dialog-bg')
-  dlg.id = 'zig-setup-dlg'
+  dlg.id = 'nim-setup-dlg'
   dlg.innerHTML = '<div class="dialog">' +
-    '<div class="dlg-title">⬡ Zig Configuration</div>' +
+    '<div class="dlg-title">Nim Configuration</div>' +
     '<div class="dlg-body" style="gap:12px">' +
-      '<div class="dlg-hint">Current zig: <code id="zig-cur-path">' + escH(current) + '</code></div>' +
+      '<div class="dlg-hint">Current zig: <code id="nim-cur-path">' + escH(current) + '</code></div>' +
       '<div class="dlg-hint">Version: <code>' + escH(ver) + '</code></div>' +
       '<div class="dlg-hint" style="margin-top:4px">If you just installed Zig, retry detection first. ' +
       'If detection fails, use Browse to locate <code>zig.exe</code> manually.</div>' +
       '<div class="dlg-row">' +
-        '<input id="zig-manual-path" class="dlg-input" type="text" ' +
-          'placeholder="C:\\zig-0.14.0\\zig.exe or /usr/local/bin/zig" ' +
+        '<input id="nim-manual-path" class="dlg-input" type="text" ' +
+          'placeholder="C:\\nim\\bin\\nim.exe or /usr/local/bin/nim" ' +
           'value="' + (current !== 'not found' ? escH(current) : '') + '" autocomplete="off"/>' +
       '</div>' +
     '</div>' +
     '<div class="dlg-footer">' +
-      '<button class="wbtn" id="zig-dlg-cancel">Cancel</button>' +
-      '<button class="wbtn" id="zig-dlg-browse">📂 Browse…</button>' +
-      '<button class="wbtn" id="zig-dlg-retry">↻ Retry Auto-detect</button>' +
-      '<button class="wbtn primary" id="zig-dlg-apply">Apply</button>' +
+      '<button class="wbtn" id="nim-dlg-cancel">Cancel</button>' +
+      '<button class="wbtn" id="nim-dlg-browse">Browse...</button>' +
+      '<button class="wbtn" id="nim-dlg-retry">R Retry Auto-detect</button>' +
+      '<button class="wbtn primary" id="nim-dlg-apply">Apply</button>' +
     '</div>' +
   '</div>'
 
   document.body.appendChild(dlg)
 
-  document.getElementById('zig-dlg-cancel').addEventListener('click', () => dlg.remove())
+  document.getElementById('nim-dlg-cancel').addEventListener('click', () => dlg.remove())
   dlg.addEventListener('click', e => { if (e.target === dlg) dlg.remove() })
 
-  document.getElementById('zig-dlg-retry').addEventListener('click', async () => {
-    const info = await go('RetryZigDetection')
+  document.getElementById('nim-dlg-retry').addEventListener('click', async () => {
+    const info = await go('RetryNimDetection')
     if (info?.version && info.version !== 'not found') {
-      dlg.remove(); $('#zig-banner')?.remove()
-      updateZigBadge(info)
-      tLine('✓ Zig auto-detected: ' + info.version + ' at ' + info.path, '#4ade80')
+      dlg.remove(); $('#nim-banner')?.remove()
+      updateNimBadge(info)
+      tLine('Nim auto-detected: ' + info.version + ' at ' + info.path, '#4ade80')
     } else {
-      document.getElementById('zig-cur-path').textContent = 'Still not found — try Browse'
-      document.getElementById('zig-cur-path').style.color = 'var(--red)'
+      document.getElementById('nim-cur-path').textContent = 'Still not found — try Browse'
+      document.getElementById('nim-cur-path').style.color = 'var(--red)'
     }
   })
 
-  document.getElementById('zig-dlg-browse').addEventListener('click', async () => {
-    const ver = await go('BrowseForZig')
+  document.getElementById('nim-dlg-browse').addEventListener('click', async () => {
+    const ver = await go('BrowseForNim')
     if (ver && !ver.startsWith('not') && !ver.startsWith('empty') && !ver.startsWith('error')) {
-      dlg.remove(); $('#zig-banner')?.remove()
-      const info = await go('GetZigInfo')
-      updateZigBadge(info)
-      tLine('✓ Zig set: ' + ver, '#4ade80')
+      dlg.remove(); $('#nim-banner')?.remove()
+      const info = await go('GetNimInfo')
+      updateNimBadge(info)
+      tLine('Nim set: ' + ver, '#4ade80')
     } else if (ver) {
       tLine('Error: ' + ver, '#f87171')
     }
   })
 
-  document.getElementById('zig-dlg-apply').addEventListener('click', async () => {
-    const p = (document.getElementById('zig-manual-path')?.value || '').trim()
+  document.getElementById('nim-dlg-apply').addEventListener('click', async () => {
+    const p = (document.getElementById('nim-manual-path')?.value || '').trim()
     if (!p) return
-    const result = await go('SetZigPath', p)
+    const result = await go('SetNimPath', p)
     if (result && !result.startsWith('not') && !result.startsWith('empty') && !result.startsWith('error')) {
-      dlg.remove(); $('#zig-banner')?.remove()
-      const info = await go('GetZigInfo')
-      updateZigBadge(info)
-      tLine('✓ Zig set to ' + p + ' (version: ' + result + ')', '#4ade80')
+      dlg.remove(); $('#nim-banner')?.remove()
+      const info = await go('GetNimInfo')
+      updateNimBadge(info)
+      tLine('Nim set to ' + p + ' (version: ' + result + ')', '#4ade80')
     } else {
       tLine('Failed: ' + (result || 'unknown error') + ' — check the path is correct', '#f87171')
     }
@@ -2814,7 +3209,7 @@ function showZigSetup() {
 
 function updateGitUI() {
   const b = $('#sb-branch')
-  if (b) b.textContent = '⎇ ' + (S.gitStatus.branch||'main')
+  if (b) b.textContent = 'branch: ' + (S.gitStatus.branch||'main')
   if (S.tree) reRenderSidebar() // refresh git markers
 }
 
@@ -2823,18 +3218,16 @@ function setRunning(v) {
   $('#kill-btn')?.classList.toggle('hidden', !v)
   $('#sb-run-ind')?.classList.toggle('hidden', !v)
 
-  // Update terminal prompt: ➜ when idle, > when process is running
+  // Update terminal prompt: > when idle, > when process is running
   const ps  = document.getElementById('term-ps')
   const inp = document.getElementById('term-in')
   if (ps) {
-    ps.textContent = v ? '>' : '➜'
+    ps.textContent = '>'
     ps.style.color = v ? '#4ade80' : ''
     ps.title = v ? 'Process running — type input here and press Enter to send' : ''
   }
   if (inp) {
-    inp.placeholder = v
-      ? 'Type program input, press Enter to send  (Ctrl+C to kill)'
-      : 'zig run … | build | test | help'
+    inp.placeholder = v ? 'Type input and press Enter to send (Ctrl+C to kill)' : 'nim r src/main.nim | build | test | help'
     if (v) setTimeout(() => inp.focus(), 80)
   }
 }
@@ -2896,7 +3289,7 @@ async function onTermKey(e) {
     if (S.termHistory.length > 500) S.termHistory.pop()
   }
   S.termHistIdx = -1
-  tLine('\n➜ ' + raw, '#7070a0')
+  tLine('\n> ' + raw, '#7070a0')
   await handleTermCmd(raw)
 }
 
@@ -2904,33 +3297,33 @@ async function handleTermCmd(raw) {
   const p=raw.trim().split(/\s+/), cmd=p[0], tab=activeTab()
   if(cmd==='clear'||cmd==='cls'){termClear();return}
   if(cmd==='help'){
-    tPrint('\x1b[33mFerrum Studio — Zig Terminal\x1b[0m\n\n'+
-      '  \x1b[2mrun [-- args]\x1b[0m      zig run <active file> [-- args]\n'+
-      '  \x1b[2mbuild [step]\x1b[0m       zig build [step]\n'+
-      '  \x1b[2mtest [args]\x1b[0m        zig test <active file>\n'+
-      '  \x1b[2mfmt\x1b[0m                zig fmt <active file>\n'+
-      '  \x1b[2mcheck\x1b[0m              zig ast-check (shows in Problems)\n'+
-      '  \x1b[2mbuild-exe\x1b[0m          zig build-exe <active file>\n'+
-      '  \x1b[2mzig <subcmd>\x1b[0m       any zig subcommand\n'+
-      '  \x1b[2mversion\x1b[0m            zig version\n'+
+    tPrint('\x1b[33mFerrum Studio — Nim Terminal\x1b[0m\n\n'+
+      '  \x1b[2mrun [args]\x1b[0m        nim r <active file> [args]\n'+
+      '  \x1b[2mbuild\x1b[0m              nim c -d:release <active file>\n'+
+      '  \x1b[2mtest\x1b[0m               nimble test\n'+
+      '  \x1b[2mfmt\x1b[0m                nimpretty <active file>\n'+
+      '  \x1b[2mcheck\x1b[0m              nim check (shows in Problems)\n'+
+      '  \x1b[2mnimble <cmd>\x1b[0m       any nimble command\n'+
+      '  \x1b[2mversion\x1b[0m            nim --version\n'+
       '  \x1b[2mclear\x1b[0m              clear terminal\n\n')
     return
   }
-  if(cmd==='version'){go('ZigVersion').then(v=>tLine(v||'?'));return}
-  if(cmd==='which'){tLine('zig: '+S.zigInfo.path);return}
-  const needsFile=new Set(['run','test','fmt','check','build-exe','build-lib','build-obj'])
+  if(cmd==='version'){go('NimVersion').then(v=>tLine(v||'?'));return}
+  if(cmd==='which'){tLine('nim: '+S.nimInfo.path);return}
+  const needsFile=new Set(['run','test','fmt','check','build-exe','build-lib'])
   if(needsFile.has(cmd)&&!tab?.path){tLine('No saved file open.','#f87171');return}
-  if(cmd==='run'){if(tab.dirty)await cmdSaveAndCheck();const rest=p.slice(1).join(' ');runZig(rest?`run ${tab.path} -- ${rest}`:`run ${tab.path}`);return}
-  if(cmd==='build'){runZig('build '+p.slice(1).join(' '));return}
-  if(cmd==='test'){if(tab.dirty)await cmdSaveAndCheck();runZig(`test ${tab.path} ${p.slice(1).join(' ')}`);return}
+  if(cmd==='run'){if(tab.dirty)await cmdSaveAndCheck();const rest=p.slice(1).join(' ');runNim(rest?`r ${tab.path} -- ${rest}`:`r ${tab.path}`);return}
+  if(cmd==='build'){runNim('nimble build '+p.slice(1).join(' '));return}
+  if(cmd==='test'){if(tab.dirty)await cmdSaveAndCheck();runNim(`nimble test`);return}
   if(cmd==='fmt'){if(tab.dirty)await cmdSaveAndCheck();await cmdFmt();return}
   if(cmd==='check'){if(tab.dirty)await cmdSaveAndCheck();await cmdCheck();return}
-  if(cmd==='build-exe'){if(tab.dirty)await cmdSaveAndCheck();runZig(`build-exe ${tab.path}`);return}
-  if(cmd==='build-lib'){if(tab.dirty)await cmdSaveAndCheck();runZig(`build-lib ${tab.path}`);return}
-  if(cmd==='init'){runZig('init');return}
-  if(cmd==='env'){runZig('env');return}
-  if(cmd==='targets'){runZig('targets');return}
-  if(cmd==='zig'){runZig(p.slice(1).join(' '));return}
+  if(cmd==='build-exe'){if(tab.dirty)await cmdSaveAndCheck();runNim(`c -d:release ${tab.path}`);return}
+  if(cmd==='build-lib'){if(tab.dirty)await cmdSaveAndCheck();runNim(`c --app:lib ${tab.path}`);return}
+  if(cmd==='init'){runNim('nimble init');return}
+  if(cmd==='env'){runNim('dump');return}
+  if(cmd==='version'){runNim('--version');return}
+  if(cmd==='nim'){runNim(p.slice(1).join(' '));return}
+  if(cmd==='nimble'){runNim('nimble '+p.slice(1).join(' '));return}
   tLine(`command not found: ${cmd}  (type 'help')`, '#f87171')
 }
 
@@ -3023,7 +3416,7 @@ async function gotoError(el) {
     for(let i=0;i<Math.min(line-1,lines.length);i++) pos+=lines[i].length+1
     pos+=Math.max(0,col-1)
     ta.focus(); ta.setSelectionRange(pos,pos)
-    ta.scrollTop=Math.max(0,(line-5)*22)
+    ta.scrollTop = Math.max(0, (line-5)*22)
     onEditorClick({target:ta})
   },60)
 }
@@ -3063,7 +3456,7 @@ async function confirmNewItem() {
   if(isDir){ await go('CreateDir',full) }
   else {
     await go('CreateFile',full)
-    const content=name.endsWith('.zig')?'const std = @import("std");\n':''
+    const content=name.endsWith('.nim')?'const std = @import("std");\n':''
     addTab(full,name,content,langOf(name))
   }
   if(S.tree){S.tree=await go('GetFileTree',S.tree.path);reRenderSidebar()}
@@ -3086,12 +3479,12 @@ async function doScaffold() {
   const typedDir = ($('#scaffold-dir')?.value||'').trim()
   const dir = typedDir || S.tree?.path || (await go('GetProjectRoot'))
   if (!dir) {
-    tLine('Please open a folder first (File → Open Folder), then create a project.', '#f87171')
+    tLine('Please open a folder first (File -> Open Folder), then create a project.', '#f87171')
     closeAllDialogs()
     return
   }
   closeAllDialogs()
-  tLine('\n$ zig init  (in ' + dir + ')', '#60a5fa')
+  tLine('\n$ nimble init  (in ' + dir + ')', '#60a5fa')
   const out = await go('ScaffoldProject', dir, 'exe')
   if (out && out.startsWith('error:')) {
     tLine(out, '#f87171')
@@ -3105,9 +3498,9 @@ async function doScaffold() {
   reRenderSidebar()
   renderBuildPanel()
   // Try to open main.zig if it exists
-  const mainPath = dir + (dir.includes('\\') ? '\\' : '/') + 'src/main.zig'
+  const mainPath = dir + (dir.includes('\\') ? '\\' : '/') + 'src/main.nim'
   const mainContent = await go('ReadFile', mainPath)
-  if (mainContent) addTab(mainPath, 'main.zig', mainContent, 'zig')
+  if (mainContent) addTab(mainPath, 'main.nim', mainContent, 'nim')
   tLine('Project ready! Run with F7 (build) or F5 (run).', '#4ade80')
 }
 
@@ -3151,7 +3544,7 @@ async function cmdSaveAndCheck() {
   const err=await go('WriteFile',tab.path,tab.content); if(err){tLine('Save error: '+err,'#f87171');return}
   tab.dirty=false; updateTabDot(tab.id)
   // Auto-check on save
-  const diags=await go('ZigCheck',tab.path)
+  const diags=await go('NimCheck',tab.path)
   if(diags) applyDiags(diags)
 }
 
@@ -3178,7 +3571,7 @@ function showSaveAsDialog(suggested) {
       </div>
       <div class="dlg-footer">
         <button class="wbtn" data-a="saveas:cancel">Cancel</button>
-        <button class="wbtn primary" data-a="saveas:ok">💾 Save</button>
+        <button class="wbtn primary" data-a="saveas:ok">Save</button>
       </div>
     </div>`
     document.getElementById('ide')?.appendChild(dlg)
@@ -3207,10 +3600,10 @@ async function cmdRun() {
   if(!tab){tLine('No file open.','#f87171');return}
   if(tab.dirty)await cmdSaveAndCheck()
   if(!tab.path){tLine('Save the file first.','#f87171');return}
-  runZig(`run ${tab.path}`)
+  runNim(`r ${tab.path}`)
 }
 
-async function cmdBuild() { runZig('build') }
+async function cmdBuild() { runNim('nimble build') }
 
 async function cmdTest() {
   const tab=activeTab()
@@ -3219,15 +3612,15 @@ async function cmdTest() {
   S.testResults=[]
   renderTestResults()
   switchPanel('tests')
-  runZig(`test ${tab.path}`)
+  runNim(`nimble test`)
 }
 
 async function cmdFmt() {
   const tab=activeTab()
   if(!tab?.path){tLine('No file to format.','#f87171');return}
   if(tab.dirty)await cmdSaveAndCheck()
-  tLine('\n$ zig fmt '+tab.name,'#60a5fa')
-  const newContent=await go('ZigFmt',tab.path)
+  tLine('\n$ nimpretty '+tab.name,'#60a5fa')
+  const newContent=await go('NimFmt',tab.path)
   if(!newContent){tLine('fmt failed.','#f87171');return}
   tab.content=newContent;tab.dirty=false
   const ta=$('#editor-ta')
@@ -3240,13 +3633,13 @@ async function cmdCheck() {
   const tab=activeTab()
   if(!tab?.path){tLine('No file to check.','#f87171');return}
   if(tab.dirty)await cmdSaveAndCheck()
-  tLine('\n$ zig ast-check '+tab.name,'#60a5fa')
-  const diags=await go('ZigCheck',tab.path)
+  tLine('\n$ nim check '+tab.name,'#60a5fa')
+  const diags=await go('NimCheck',tab.path)
   applyDiags(diags||[])
   switchPanel('problems')
   const errs=(diags||[]).filter(d=>d.kind==='error').length
-  if(!errs)tLine('✓ No errors.','#4ade80')
-  else tLine(`✕ ${errs} error${errs>1?'s':''}  —  see Problems panel.`,'#f87171')
+  if(!errs)tLine('No errors.','#4ade80')
+  else tLine(`x ${errs} error${errs>1?'s':''}  —  see Problems panel.`,'#f87171')
 }
 
 function cmdKill(){go('KillProc');if(S.running){setRunning(false);tLine('\nkilled.','#f87171')}}
@@ -3255,7 +3648,7 @@ function showArgsDialog() {
   const tab=activeTab()
   if(!tab?.path){tLine('No file open.','#f87171');return}
   const dlg=$('#args-dlg');if(!dlg)return
-  const pre=$('#args-prefix');if(pre)pre.textContent=`zig run ${tab.name} -- `
+  const pre=$('#args-prefix');if(pre)pre.textContent=`nim r ${tab.name} `
   dlg.classList.remove('hidden')
   setTimeout(()=>$('#args-in')?.focus(),40)
 }
@@ -3264,7 +3657,7 @@ async function runWithArgs() {
   const tab=activeTab();if(!tab?.path)return
   const args=($('#args-in')?.value||'').trim();closeAllDialogs()
   if(tab.dirty)await cmdSaveAndCheck()
-  runZig(args?`run ${tab.path} -- ${args}`:`run ${tab.path}`)
+  runNim(args?`r ${tab.path} -- ${args}`:`r ${tab.path}`)
 }
 
 // ── Tree context menu ─────────────────────────────────────────────────────────
@@ -3334,8 +3727,8 @@ function openGotoLine() {
   ta.focus()
   ta.setSelectionRange(pos, pos + (lines[line-1]||'').length)
   // Scroll code-pane to show the line
-  const pane = document.getElementById('code-pane')
-  if (pane) pane.scrollTop = Math.max(0, (line-5)*22)
+  const scroller = document.getElementById('editor-ta')
+  if (scroller) scroller.scrollTop = Math.max(0, (line-5)*22)
 }
 
 function openQuickOpen() {
@@ -3412,11 +3805,11 @@ function openFind() {
     bar.innerHTML=`
       <input id="find-in" class="find-in" type="text" placeholder="Find…" autocomplete="off"/>
       <span id="find-cnt" class="find-cnt"></span>
-      <button class="find-btn" data-a="find:prev">↑</button>
-      <button class="find-btn" data-a="find:next">↓</button>
+      <button class="find-btn" data-a="find:prev">Up</button>
+      <button class="find-btn" data-a="find:next">Down</button>
       <label class="find-chk"><input type="checkbox" id="find-case"/> Aa</label>
       <label class="find-chk"><input type="checkbox" id="find-regex"/> .*</label>
-      <button class="find-x" data-a="find:close">✕</button>`
+      <button class="find-x" data-a="find:close">x</button>`
     document.body.appendChild(bar)
     const inp=$('#find-in')
     inp.addEventListener('keydown',e=>{
@@ -3472,8 +3865,6 @@ function onDrag(e) {
 }
 
 // ── Dialogs ───────────────────────────────────────────────────────────────────
-// Font size — Ctrl+= bigger, Ctrl+- smaller, Ctrl+0 reset
-let _fontSize = parseInt(localStorage.getItem('ferrum-fontsize') || '13', 10)
 function adjustFontSize(delta) {
   if (delta === 0) {
     _fontSize = 13
@@ -3516,7 +3907,7 @@ function reRenderEditor() {
   _lineCache.length = 0
   S._lastLineCount = 0
   const lang=activeTab()?.lang||'text'
-  const lel=$('#sb-lang');if(lel)lel.textContent=lang==='zig'?'Zig':'Text'
+  const lel=$('#sb-lang');if(lel)lel.textContent=lang==='nim'?'Nim':'Text'
   $('#tab-bar')?.replaceWith(buildTabBar())
   $('#editor-area')?.replaceWith(buildEditorArea())
   setTimeout(() => {
