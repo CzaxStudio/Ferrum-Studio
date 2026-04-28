@@ -179,83 +179,48 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg)}
 .diag-ln-warning{color:var(--yel)!important;background:rgba(251,191,36,.06)!important}
 .diag-ln-note{color:var(--blue)!important;background:rgba(96,165,250,.06)!important}
 
-/* ── Code pane ───────────────────────────────────────────────────────────────
-   THIS is the single scroll container for the editor content.
-   All children (.hl, .squiggle-layer, #editor-ta) are absolute-positioned
-   at top:0 left:0 inside it. They share the same scroll viewport so they
-   always stay perfectly aligned — no JS sync needed.
-── */
 .code-pane{
   flex:1;
   position:relative;
-  overflow:auto;            /* THE scroll container — not the textarea */
+  overflow:hidden;
   background:var(--bg);
 }
-.code-pane::-webkit-scrollbar{width:8px;height:8px}
-.code-pane::-webkit-scrollbar-track{background:var(--bg)}
-.code-pane::-webkit-scrollbar-thumb{background:var(--bg4);border-radius:4px}
-.code-pane::-webkit-scrollbar-thumb:hover{background:var(--tx2)}
-
-/* ── Editor inner — expands to fit all content, children position inside it ── */
-.editor-inner{
-  position:relative;
-  min-width:100%;
-  min-height:100%;
-  display:inline-block;     /* shrink-wraps to content width for horizontal scroll */
-}
-
-/* ── Current line highlight ──────────────────────────────────────────────── */
 .cur-line-hl{
-  position:absolute;
-  left:0;right:0;           /* spans the inner width */
+  position:absolute;left:0;right:0;
   height:var(--lh);
   background:rgba(255,255,255,.04);
-  pointer-events:none;
-  z-index:0;
+  pointer-events:none;z-index:0;
+  will-change:transform;
 }
-
-/* ── Highlight / syntax layer ────────────────────────────────────────────── */
 .hl{
   position:absolute;top:0;left:0;
   padding:12px 16px;
   pointer-events:none;
   font-family:var(--mono);font-size:13px;line-height:var(--lh);
-  white-space:pre;
-  color:var(--tx1);
-  tab-size:4;
+  white-space:pre;color:var(--tx1);tab-size:4;
   z-index:1;
   -webkit-font-smoothing:antialiased;
+  will-change:transform;
 }
 .cl{height:var(--lh);min-height:var(--lh);white-space:pre}
-
-/* ── Squiggle overlay ────────────────────────────────────────────────────── */
 .squiggle-layer{
   position:absolute;top:0;left:0;
-  pointer-events:none;
-  z-index:3;
+  pointer-events:none;z-index:3;
+  will-change:transform;
 }
 .sq{position:absolute;height:3px;border-radius:2px}
 .sq-error{background:repeating-linear-gradient(90deg,transparent 0,transparent 2px,var(--red) 2px,var(--red) 4px,transparent 4px,transparent 6px,var(--red) 6px,var(--red) 8px);opacity:.9}
 .sq-warning{background:repeating-linear-gradient(90deg,transparent 0,transparent 2px,var(--yel) 2px,var(--yel) 4px,transparent 4px,transparent 6px,var(--yel) 6px,var(--yel) 8px);opacity:.8}
 .sq-note{background:repeating-linear-gradient(90deg,transparent 0,transparent 2px,var(--blue) 2px,var(--blue) 4px,transparent 4px,transparent 6px,var(--blue) 6px,var(--blue) 8px);opacity:.7}
-
-/* ── Textarea ────────────────────────────────────────────────────────────────
-   No overflow — it does NOT scroll. The code-pane scrolls.
-   Sized to match the hl layer exactly so the caret aligns with colored text.
-   width/height are set programmatically in resizeTextarea().
-── */
 #editor-ta{
-  position:absolute;top:0;left:0;
+  position:absolute;top:0;left:0;right:0;bottom:0;
+  width:100%;height:100%;
   padding:12px 16px;
-  background:transparent;
-  border:none;outline:none;resize:none;
+  background:transparent;border:none;outline:none;resize:none;
   font-family:var(--mono);font-size:13px;line-height:var(--lh);
-  color:transparent;
-  caret-color:var(--acc);
-  -webkit-text-fill-color:transparent;
-  white-space:pre;
-  tab-size:4;
-  overflow:hidden;          /* NO internal scroll — code-pane scrolls instead */
+  color:transparent;caret-color:var(--acc);-webkit-text-fill-color:transparent;
+  white-space:pre;tab-size:4;
+  overflow:auto;
   z-index:2;
   -webkit-font-smoothing:antialiased;
 }
