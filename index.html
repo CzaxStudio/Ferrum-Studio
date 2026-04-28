@@ -1,458 +1,634 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>Ferrum Studio — Native IDE for Zig on Windows</title>
-  <!-- Google Fonts + basic reset -->
-  <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700;14..32,800&display=swap" rel="stylesheet">
-  <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>Ferrum Studio · Native IDE for Nim</title>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-    body {
-      background: #0a0c10;
-      font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
-      color: #eef2ff;
-      line-height: 1.5;
-      scroll-behavior: smooth;
-    }
+        body {
+            background: #0a0c10;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+            color: #e8edf5;
+            line-height: 1.5;
+        }
 
-    /* custom scrollbar */
-    ::-webkit-scrollbar {
-      width: 8px;
-      height: 8px;
-    }
-    ::-webkit-scrollbar-track {
-      background: #1e1f2c;
-    }
-    ::-webkit-scrollbar-thumb {
-      background: #4b5563;
-      border-radius: 8px;
-    }
-    ::-webkit-scrollbar-thumb:hover {
-      background: #6b7280;
-    }
+        /* iron-like texture, very subtle */
+        body::before {
+            content: "";
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: radial-gradient(circle at 15% 30%, rgba(60, 75, 100, 0.08) 1.5px, transparent 1.5px);
+            background-size: 32px 32px;
+            pointer-events: none;
+            z-index: 0;
+        }
 
-    .container {
-      max-width: 1280px;
-      margin: 0 auto;
-      padding: 0 24px;
-    }
+        .container {
+            max-width: 1320px;
+            margin: 0 auto;
+            padding: 2rem 2rem 4rem;
+            position: relative;
+            z-index: 2;
+        }
 
-    /* header / nav */
-    .navbar {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      flex-wrap: wrap;
-      padding: 20px 0;
-      border-bottom: 1px solid #2d2f3e;
-    }
-    .logo {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      font-size: 1.6rem;
-      font-weight: 700;
-      letter-spacing: -0.3px;
-    }
-    .logo-symbol {
-      background: #f97316;
-      width: 32px;
-      height: 32px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      border-radius: 8px;
-      font-weight: 800;
-      color: #0a0c10;
-    }
-    .nav-links {
-      display: flex;
-      gap: 28px;
-      align-items: center;
-    }
-    .nav-links a {
-      color: #cbd5e6;
-      text-decoration: none;
-      font-weight: 500;
-      transition: 0.2s;
-    }
-    .nav-links a:hover {
-      color: #f97316;
-    }
-    .download-btn {
-      background: #f97316;
-      padding: 8px 20px;
-      border-radius: 40px;
-      color: white !important;
-      font-weight: 600;
-      box-shadow: 0 4px 10px rgba(249,115,22,0.2);
-    }
-    .download-btn:hover {
-      background: #fd8a3c;
-      transform: scale(0.97);
-    }
+        /* header */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            flex-wrap: wrap;
+            border-bottom: 1px solid #1e2738;
+            padding-bottom: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        .logo-block {
+            display: flex;
+            align-items: baseline;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .ferrum-mark {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.9rem;
+            font-weight: 500;
+            letter-spacing: 2px;
+            background: linear-gradient(130deg, #c0d4ff, #9bb0e6);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+        .ferrum-mark small {
+            font-size: 0.8rem;
+            font-weight: 400;
+            letter-spacing: 0;
+            background: none;
+            color: #6f7da0;
+        }
+        .badge-row {
+            display: flex;
+            gap: 12px;
+            font-size: 0.75rem;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .badge {
+            background: #151e2a;
+            padding: 0.2rem 0.8rem;
+            border-radius: 24px;
+            border: 1px solid #2e3a4c;
+            color: #b7c6e6;
+        }
+        .tagline {
+            font-size: 0.9rem;
+            color: #8f9ec2;
+            margin-top: 6px;
+        }
 
-    /* hero */
-    .hero {
-      padding: 60px 0 40px;
-      text-align: center;
-    }
-    .badge-row {
-      display: flex;
-      justify-content: center;
-      gap: 12px;
-      flex-wrap: wrap;
-      margin-bottom: 24px;
-    }
-    .badge {
-      background: #1e1f2e;
-      padding: 6px 14px;
-      border-radius: 40px;
-      font-size: 0.85rem;
-      font-weight: 500;
-      backdrop-filter: blur(4px);
-    }
-    .hero h1 {
-      font-size: 3.5rem;
-      font-weight: 800;
-      background: linear-gradient(135deg, #ffffff, #f97316);
-      background-clip: text;
-      -webkit-background-clip: text;
-      color: transparent;
-      margin-bottom: 20px;
-    }
-    .hero p {
-      font-size: 1.25rem;
-      color: #b9c3db;
-      max-width: 720px;
-      margin: 0 auto 32px;
-    }
-    .cta-group {
-      display: flex;
-      gap: 16px;
-      justify-content: center;
-      flex-wrap: wrap;
-    }
-    .btn-primary {
-      background: #f97316;
-      border: none;
-      padding: 12px 32px;
-      font-weight: 600;
-      border-radius: 40px;
-      color: white;
-      font-size: 1rem;
-      cursor: pointer;
-      transition: 0.2s;
-      text-decoration: none;
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .btn-secondary {
-      background: #2d2f3e;
-      border: 1px solid #4b5563;
-      padding: 12px 28px;
-      border-radius: 40px;
-      color: #e2e8f0;
-      font-weight: 500;
-      text-decoration: none;
-      transition: 0.2s;
-    }
-    .btn-secondary:hover {
-      background: #3b3f54;
-    }
+        /* OS detection panel */
+        .os-panel {
+            background: #0f141e;
+            border: 1px solid #252e42;
+            border-radius: 28px;
+            padding: 2rem 2rem 1.8rem;
+            margin: 1rem 0 2.2rem;
+            box-shadow: 0 12px 28px -12px rgba(0,0,0,0.6);
+            transition: border 0.2s;
+        }
+        .detection-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: #0a1019;
+            padding: 0.5rem 1rem;
+            width: fit-content;
+            border-radius: 60px;
+            border: 1px solid #252f40;
+            margin-bottom: 1.5rem;
+            font-size: 0.85rem;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .os-badge {
+            font-weight: 600;
+            color: #cddcff;
+        }
+        .download-area {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            gap: 2rem;
+        }
+        .download-description {
+            flex: 2;
+        }
+        .download-description h2 {
+            font-size: 1.9rem;
+            font-weight: 600;
+            letter-spacing: -0.3px;
+            color: #ebf0ff;
+            margin-bottom: 0.4rem;
+        }
+        .version-indicator {
+            font-family: 'JetBrains Mono', monospace;
+            background: #111a24;
+            padding: 0.2rem 1rem;
+            border-radius: 24px;
+            display: inline-block;
+            font-size: 0.75rem;
+            border: 1px solid #2b374c;
+            margin: 0.5rem 0 1rem 0;
+        }
+        .btn-primary {
+            background: #2a3a5c;
+            border: none;
+            padding: 0.9rem 2rem;
+            border-radius: 48px;
+            font-weight: 600;
+            font-size: 1rem;
+            font-family: 'Inter', sans-serif;
+            color: white;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            border: 1px solid #3d5078;
+        }
+        .btn-primary:hover {
+            background: #36507c;
+            transform: translateY(-1px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+        }
+        .btn-primary:active {
+            transform: translateY(1px);
+        }
+        .secondary-links {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            margin-top: 1.8rem;
+            justify-content: flex-start;
+        }
+        .link-outline {
+            background: transparent;
+            border: 1px solid #2e3b52;
+            padding: 0.4rem 1.2rem;
+            border-radius: 40px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            color: #b3c2e3;
+            transition: 0.15s;
+            text-decoration: none;
+        }
+        .link-outline:hover {
+            background: #1c2538;
+            border-color: #586f9a;
+            color: white;
+            text-decoration: none;
+        }
+        .info-note {
+            font-size: 0.75rem;
+            color: #6e7e9e;
+            margin-top: 1.2rem;
+            border-top: 1px solid #1e2538;
+            padding-top: 1rem;
+        }
 
-    /* terminal mock */
-    .terminal-mock {
-      background: #0f111a;
-      border-radius: 16px;
-      border: 1px solid #2a2c3c;
-      margin: 48px 0;
-      overflow: hidden;
-      box-shadow: 0 20px 35px -12px rgba(0,0,0,0.5);
-    }
-    .term-header {
-      background: #181c27;
-      padding: 12px 20px;
-      display: flex;
-      gap: 10px;
-      border-bottom: 1px solid #2a2c3c;
-    }
-    .term-dot {
-      width: 12px;
-      height: 12px;
-      border-radius: 50%;
-      background: #ed6a5e;
-    }
-    .term-dot:nth-child(2) { background: #f5bd4f; }
-    .term-dot:nth-child(3) { background: #61c454; }
-    .term-body {
-      padding: 20px;
-      font-family: 'SF Mono', 'Fira Code', monospace;
-      font-size: 0.85rem;
-      background: #0b0e16;
-      color: #cdd9f4;
-    }
+        /* feature cards */
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 1.6rem;
+            margin: 3rem 0 2.5rem;
+        }
+        .feature {
+            background: #0e131e;
+            border-radius: 1.2rem;
+            padding: 1.4rem 1.4rem;
+            border: 1px solid #20273c;
+            transition: border 0.1s;
+        }
+        .feature h3 {
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 0.6rem;
+            letter-spacing: -0.2px;
+            color: #cedcff;
+        }
+        .feature p {
+            font-size: 0.85rem;
+            color: #9aaaCA;
+            line-height: 1.45;
+        }
+        .divider-light {
+            height: 1px;
+            background: #1a2133;
+            margin: 1.8rem 0;
+        }
 
-    /* features grid */
-    .section-title {
-      font-size: 2rem;
-      font-weight: 700;
-      margin: 48px 0 24px;
-      border-left: 4px solid #f97316;
-      padding-left: 20px;
-    }
-    .features-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-      gap: 24px;
-      margin: 32px 0;
-    }
-    .feature-card {
-      background: #11131f;
-      border-radius: 20px;
-      padding: 24px;
-      border: 1px solid #252837;
-      transition: all 0.2s;
-    }
-    .feature-card:hover {
-      border-color: #f97316;
-      transform: translateY(-3px);
-    }
-    .feature-icon {
-      font-size: 2rem;
-      margin-bottom: 12px;
-    }
-    .feature-card h3 {
-      font-size: 1.35rem;
-      margin-bottom: 12px;
-    }
-    .feature-card p, .feature-card li {
-      color: #a3b3d6;
-      font-size: 0.9rem;
-    }
-    .key-list {
-      list-style: none;
-      margin-top: 12px;
-    }
-    .key-list li {
-      margin-bottom: 6px;
-      display: flex;
-      gap: 10px;
-    }
-    kbd {
-      background: #1f2538;
-      padding: 2px 8px;
-      border-radius: 6px;
-      font-family: monospace;
-      font-weight: 600;
-      color: #facc15;
-    }
+        /* reference table */
+        .comparison {
+            background: #0b1019;
+            border-radius: 1rem;
+            border: 1px solid #222b3d;
+            overflow-x: auto;
+            margin: 2rem 0;
+        }
+        .comp-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.8rem;
+        }
+        .comp-table th {
+            text-align: left;
+            padding: 1rem 1rem 0.8rem 1rem;
+            font-weight: 600;
+            color: #bdc9f0;
+            border-bottom: 1px solid #212b3f;
+        }
+        .comp-table td {
+            padding: 0.8rem 1rem;
+            border-bottom: 1px solid #171f2e;
+            color: #cbd5ed;
+        }
+        .comp-table tr:last-child td {
+            border-bottom: none;
+        }
+        .check-mark {
+            color: #7fbc6e;
+            font-weight: 600;
+        }
 
-    /* comparison table */
-    .compare-table {
-      width: 100%;
-      border-collapse: collapse;
-      background: #0f111c;
-      border-radius: 20px;
-      overflow: hidden;
-      margin: 24px 0;
-    }
-    .compare-table th, .compare-table td {
-      padding: 14px 16px;
-      text-align: left;
-      border-bottom: 1px solid #252837;
-    }
-    .compare-table th {
-      background: #1a1d2b;
-      font-weight: 600;
-    }
-    .compare-table td:first-child {
-      font-weight: 500;
-    }
-    .check {
-      color: #4ade80;
-    }
-
-    /* download banner */
-    .win-banner {
-      background: linear-gradient(135deg, #1e293b, #0f172a);
-      border-radius: 32px;
-      padding: 40px 32px;
-      margin: 48px 0;
-      border: 1px solid #f9731666;
-      text-align: center;
-    }
-    .win-banner h2 {
-      font-size: 1.8rem;
-      margin-bottom: 12px;
-    }
-    .win-badge {
-      background: #0078d4;
-      display: inline-block;
-      padding: 4px 12px;
-      border-radius: 30px;
-      font-size: 0.8rem;
-      margin-bottom: 20px;
-    }
-
-    footer {
-      border-top: 1px solid #252837;
-      padding: 40px 0 32px;
-      margin-top: 48px;
-      text-align: center;
-      color: #7e8aa8;
-    }
-    @media (max-width: 700px) {
-      .hero h1 { font-size: 2.3rem; }
-      .navbar { flex-direction: column; gap: 16px; }
-    }
-  </style>
+        /* shortcut panel */
+        .shortcut-panel {
+            background: #0d121c;
+            border-radius: 1.2rem;
+            padding: 1.2rem 1.5rem;
+            margin-top: 2rem;
+            border: 1px solid #222b3c;
+        }
+        .shortcut-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 0.7rem;
+            margin-top: 1rem;
+        }
+        .shortcut-item {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            display: flex;
+            justify-content: space-between;
+            background: #070b12;
+            padding: 0.3rem 0.8rem;
+            border-radius: 12px;
+        }
+        kbd {
+            background: #1b2438;
+            padding: 0.2rem 0.55rem;
+            border-radius: 6px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.7rem;
+            font-weight: 500;
+            color: #e0e9ff;
+            border: 1px solid #2f3e5c;
+        }
+        .footer {
+            margin-top: 3rem;
+            border-top: 1px solid #1a2135;
+            padding-top: 1.8rem;
+            display: flex;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 1rem;
+            font-size: 0.75rem;
+            color: #7a88aa;
+        }
+        a {
+            color: #b2c2ed;
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+            color: #dfe8ff;
+        }
+        @media (max-width: 720px) {
+            .container {
+                padding: 1.2rem;
+            }
+            .download-area {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            .btn-primary {
+                width: 100%;
+                justify-content: center;
+            }
+        }
+    </style>
 </head>
 <body>
 <div class="container">
-  <!-- navigation -->
-  <div class="navbar">
-    <div class="logo">
-      <span class="logo-symbol">⬡</span> Ferrum Studio
+    <div class="header">
+        <div>
+            <div class="logo-block">
+                <span class="ferrum-mark">⬡ FERRUM STUDIO <small>v0.7</small></span>
+            </div>
+            <div class="tagline">professional IDE · built exclusively for Nim · native · zero Electron</div>
+        </div>
+        <div class="badge-row">
+            <span class="badge">Nim 2.2+</span>
+            <span class="badge">Wails v2</span>
+            <span class="badge">MIT</span>
+        </div>
     </div>
-    <div class="nav-links">
-      <a href="#features">Features</a>
-      <a href="#shortcuts">Shortcuts</a>
-      <a href="#install">Download</a>
-      <a href="https://github.com/CzaxStudio/Ferrum-Studio" target="_blank">GitHub</a>
-      <a href="https://github.com/CzaxStudio/Ferrum-Studio/releases/download/Windows/ferrum.exe" class="download-btn">⬇ Windows .exe</a>
-    </div>
-  </div>
 
-  <!-- hero -->
-  <div class="hero">
-    <div class="badge-row">
-      <span class="badge">Built for Zig</span>
-      <span class="badge">Native Windows IDE</span>
-      <span class="badge">Zero Electron / ~12 MB</span>
+    <!-- dynamic OS detection + download area (no emojis) -->
+    <div class="os-panel" id="coreDownloadPanel">
+        <div class="detection-row">
+            <span>system detection</span>
+            <span class="os-badge" id="detectedOsLabel">detecting...</span>
+        </div>
+        <div class="download-area">
+            <div class="download-description">
+                <h2 id="downloadHeadingText">Ferrum Studio for <span id="osNameSpan">your platform</span></h2>
+                <div class="version-indicator">release 0.7 · nim language server ready</div>
+                <p style="margin-top: 12px; max-width: 500px; font-size: 0.9rem;">
+                starts in less than 1 second · under 50 MB memory · native webview backend.
+                </p>
+            </div>
+            <div>
+                <button class="btn-primary" id="primaryDownloadBtn">
+                    <span>↓</span> Download Ferrum Studio
+                </button>
+            </div>
+        </div>
+        <div class="secondary-links">
+            <a href="https://github.com/CzaxStudio/Ferrum-Studio" target="_blank" class="link-outline">source code · github</a>
+            <a href="https://github.com/CzaxStudio/Ferrum-Studio/releases" target="_blank" class="link-outline">all releases</a>
+            <a href="#" id="manualAlternativeLink" class="link-outline">direct windows build (exe)</a>
+        </div>
+        <div class="info-note" id="platformNote">
+            Windows build available now · macOS and Linux native builds under active development. Nim compiler required (1.6+ or 2.x)
+        </div>
     </div>
-    <h1>Ferrum Studio<br><span style="font-size: 1.8rem;">The professional IDE exclusively for Zig</span></h1>
-    <p>Fast, native, and lightweight — starts in <strong>&lt;1 second</strong>, uses ~35 MB RAM. No Chromium, no bloat. Designed for Zig developers who value performance.</p>
-    <div class="cta-group">
-      <a href="https://github.com/CzaxStudio/Ferrum-Studio/releases/download/Windows/ferrum.exe" class="btn-primary">⬇ Download for Windows</a>
-      <a href="https://github.com/CzaxStudio/Ferrum-Studio" class="btn-secondary" target="_blank">View on GitHub</a>
-    </div>
-  </div>
 
-  <!-- terminal mockup as seen in README -->
-  <div class="terminal-mock">
-    <div class="term-header">
-      <div class="term-dot"></div><div class="term-dot"></div><div class="term-dot"></div>
-      <span style="margin-left: 12px; font-size: 0.75rem;">zig 0.14.0 — windows</span>
+    <!-- feature set -->
+    <div class="features">
+        <div class="feature">
+            <h3>nim-first tooling</h3>
+            <p>syntax highlighting, nim check diagnostics, nim pretty formatting, run with F5/F6, integrated test runner, smart indentation and snippets.</p>
+        </div>
+        <div class="feature">
+            <h3>native performance</h3>
+            <p>built with Go + Wails. no Electron. ~8MB binary size, ~35MB idle memory, cold start under 1 second.</p>
+        </div>
+        <div class="feature">
+            <h3>developer experience</h3>
+            <p>problems panel with human-readable errors, suggestion engine, git status indicators, integrated terminal and build profiles.</p>
+        </div>
+        <div class="feature">
+            <h3>project templates</h3>
+            <p>cli app, library, web, async, metaprogramming — generate nim projects instantly. snippet browser included.</p>
+        </div>
     </div>
-    <div class="term-body">
-      <pre style="margin:0; font-family: inherit;">┌─────────────────────────────────────────────────────────────┐
-│ File  Edit  Run  Zig  View            zig 0.14.0  windows   │
-├──────┬──────────────────────────────────────────────────────┤
-│      │  main.zig  ×                                         │
-│      ├─ src / main.zig ──────────────────────────────────── │
-│      │  1  const std = @import("std");                      │
-│      │  2                                                   │
-│ src/ │  3  pub fn main() !void {                            │
-│  main│  4      const stdout = std.io.getStdOut().writer();  │
-│ build│  5      try stdout.print("Hello!\n", .{});           │
-│      │  6  }                                                │
-│      ├──────────────────────────────────────────────────────│
-│      │ Terminal      Problems   Tests   Build               │
-│      │ $ zig run src/main.zig                               │
-│      │ Hello!                                               │
-│      │ ─── ✓ exit 0 (0.31s) ───                             |
-└──────┴──────────────────────────────────────────────────────┘</pre>
-    </div>
-  </div>
 
-  <!-- Features section -->
-  <div id="features">
-    <div class="section-title"> Zig-first tooling</div>
-    <div class="features-grid">
-      <div class="feature-card"><div class="feature-icon"></div><h3>Smart editing</h3><p>Syntax highlighting, bracket auto-close, 120+ IntelliSense completions, 29 Zig snippets (fn, struct, gpa, al...). Ctrl+D multi-select, inline error ghost text.</p></div>
-      <div class="feature-card"><div class="feature-icon"></div><h3>Run & build instantly</h3><p>F5 → zig run, F7 → zig build, F8 → zig test. Interactive stdin & live output. Stop process with Ctrl+C. Build steps panel reads build.zig.</p></div>
-      <div class="feature-card"><div class="feature-icon"></div><h3>Human-readable errors</h3><p>Problems panel with plain‑English explanations and fix suggestions. Error squiggles, click-to-jump, auto-check after 2.5s idle.</p></div>
-      <div class="feature-card"><div class="feature-icon"></div><h3>Project templates</h3><p>5 starters: Executable (CLI), Library, TCP Server, Embedded (Cortex-M4), Comptime Metaprogramming. Auto‑creates files and opens main.zig.</p></div>
-      <div class="feature-card"><div class="feature-icon"></div><h3>Integrated terminal + Git</h3><p>Full ANSI terminal, command history, branch name, Git status (M/A/?) in file tree. Zig detection with registry & PATH scanning.</p></div>
-      <div class="feature-card"><div class="feature-icon"></div><h3>Native & responsive</h3><p>Built with Go + Wails, WebView2 (Windows). Font size shortcuts, word wrap toggle, multi‑tab, save before close, and ultra‑low memory.</p></div>
+    <!-- shortcuts section -->
+    <div class="shortcut-panel">
+        <h3 style="font-weight: 500; font-size: 1rem; margin-bottom: 0.2rem;">keyboard shortcuts · run & navigate</h3>
+        <div style="font-size:0.75rem; color:#8b9ad0; margin-bottom: 1rem;">designed for nim workflows</div>
+        <div class="shortcut-grid">
+            <div class="shortcut-item"><span>run file</span> <kbd>F5</kbd></div>
+            <div class="shortcut-item"><span>run with arguments</span> <kbd>F6</kbd></div>
+            <div class="shortcut-item"><span>build (nim c)</span> <kbd>F7</kbd></div>
+            <div class="shortcut-item"><span>test</span> <kbd>F8</kbd></div>
+            <div class="shortcut-item"><span>save + check</span> <kbd>Ctrl+S</kbd></div>
+            <div class="shortcut-item"><span>format with nim pretty</span> <kbd>Ctrl+Shift+F</kbd></div>
+            <div class="shortcut-item"><span>quick open file</span> <kbd>Ctrl+P</kbd></div>
+            <div class="shortcut-item"><span>toggle line comment</span> <kbd>Ctrl+/</kbd></div>
+            <div class="shortcut-item"><span>go to line</span> <kbd>Ctrl+G</kbd></div>
+            <div class="shortcut-item"><span>increase / decrease font</span> <kbd>Ctrl+=</kbd> <kbd>Ctrl+-</kbd></div>
+        </div>
     </div>
-  </div>
 
-  <!-- shortcuts & snippets teaser -->
-  <div id="shortcuts">
-    <div class="section-title"> Keyboard efficiency</div>
-    <div class="features-grid" style="grid-template-columns: repeat(auto-fit, minmax(240px,1fr));">
-      <div class="feature-card"><h3>Editor</h3><ul class="key-list"><li><kbd>Ctrl+S</kbd> Save & check</li><li><kbd>Ctrl+Shift+F</kbd> zig fmt</li><li><kbd>Ctrl+D</kbd> select next</li><li><kbd>Ctrl+P</kbd> quick open</li><li><kbd>Ctrl+G</kbd> go to line</li><li><kbd>Ctrl+/</kbd> toggle comment</li><li><kbd>Home</kbd> smart home</li></ul></div>
-      <div class="feature-card"><h3>Run / Zig</h3><ul class="key-list"><li><kbd>F5</kbd> Run file</li><li><kbd>F6</kbd> Run with args</li><li><kbd>F7</kbd> zig build</li><li><kbd>F8</kbd> zig test</li><li><kbd>Ctrl+Shift+C</kbd> ast-check</li><li><kbd>Ctrl+C</kbd> kill process</li></ul></div>
-      <div class="feature-card"><h3>Navigation</h3><ul class="key-list"><li><kbd>Ctrl+Tab</kbd> switch tabs</li><li><kbd>Ctrl+W</kbd> close tab</li><li><kbd>Escape</kbd> close dialogs</li><li><kbd>Ctrl+= / -</kbd> font size</li><li><kbd>Ctrl+Shift+W</kbd> word wrap</li></ul></div>
+    <!-- comparison table (clean) -->
+    <div class="comparison">
+        <table class="comp-table">
+            <thead>
+                <tr><th></th><th>Ferrum Studio</th><th>VS Code + Nim plugin</th><th>Zed</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>purpose-built for Nim</td><td class="check-mark">✓</td><td>partial</td><td>partial</td></tr>
+                <tr><td>native (no Electron)</td><td class="check-mark">✓</td><td>✗</td><td class="check-mark">✓</td></tr>
+                <tr><td>human-readable errors + fix hints</td><td class="check-mark">✓</td><td>✗</td><td>✗</td></tr>
+                <tr><td>RAM usage (idle)</td><td>~35 MB</td><td>~300 MB</td><td>~80 MB</td></tr>
+                <tr><td>cold start time</td><td>&lt; 1 s</td><td>3–8 s</td><td>1–2 s</td></tr>
+            </tbody>
+        </table>
     </div>
-    <div style="background:#11131f; border-radius: 20px; padding: 20px; margin: 24px 0;">
-      <h3 style="display: flex; gap: 12px; align-items:center;"> Popular Zig snippets <span style="font-size:0.8rem;">(type → Tab)</span></h3>
-      <div style="display: flex; flex-wrap: wrap; gap: 12px; margin-top: 16px;">
-        <span><kbd>fn</kbd> → function</span> <span><kbd>pfn</kbd> → pub fn</span> <span><kbd>main</kbd> → pub fn main</span> <span><kbd>gpa</kbd> → GPA allocator</span> <span><kbd>al</kbd> → ArrayList</span> <span><kbd>hm</kbd> → StringHashMap</span> <span><kbd>defer</kbd> / <kbd>errd</kbd></span> <span><kbd>struct</kbd> / <kbd>enum</kbd></span>
-      </div>
-    </div>
-  </div>
 
-  <!-- Comparison table -->
-  <div>
-    <div class="section-title"> Ferrum Studio vs. general editors</div>
-    <table class="compare-table">
-      <thead><tr><th>Feature</th><th>Ferrum Studio</th><th>VS Code + ZLS</th><th>Zed</th></tr>
-      </thead>
-      <tbody>
-        <tr><td>Purpose-built for Zig</td><td class="check">✓</td><td>Partial</td><td>Partial</td></tr>
-        <tr><td>Native (no Electron)</td><td class="check">✓</td><td>✗</td><td class="check">✓</td></tr>
-        <tr><td>Human-readable errors + fixes</td><td class="check">✓</td><td>✗</td><td>✗</td></tr>
-        <tr><td>Zig project templates</td><td class="check">✓</td><td>✗</td><td>✗</td></tr>
-        <tr><td>Auto Zig detection (registry/PATH)</td><td class="check">✓</td><td>Manual</td><td>Manual</td></tr>
-        <tr><td>RAM usage (idle)</td><td>~35 MB</td><td>~300 MB</td><td>~80 MB</td></tr>
-        <tr><td>Cold start time</td><td>&lt; 1 s</td><td>3–8 s</td><td>1–2 s</td></tr>
-      </tbody>
-    </table>
-  </div>
-
-  <!-- Windows + download banner (main release) -->
-  <div id="install" class="win-banner">
-    <div class="win-badge"> Windows 10 / 11 • WebView2 ready</div>
-    <h2>Download Ferrum Studio for Windows</h2>
-    <p style="max-width: 600px; margin: 12px auto;">Single executable, ~12 MB. No installation required — just download and run. <br>Requires Zig 0.13+ (auto-detection finds your installation).</p>
-    <div style="margin-top: 24px; display: flex; gap: 20px; justify-content: center; flex-wrap: wrap;">
-      <a href="https://github.com/CzaxStudio/Ferrum-Studio/releases/download/Windows/ferrum.exe" class="btn-primary" style="background:#f97316; font-size:1.1rem;">ferrum.exe (latest)</a>
-      <a href="https://github.com/CzaxStudio/Ferrum-Studio" target="_blank" class="btn-secondary">GitHub repository & source</a>
+    <div class="footer">
+        <div>Ferrum Studio · MIT license · built for the Nim community</div>
+        <div><a href="https://github.com/CzaxStudio/Ferrum-Studio" target="_blank">GitHub repository</a> · <a href="https://github.com/CzaxStudio/Ferrum-Studio/issues" target="_blank">report issue</a></div>
     </div>
-    <p style="margin-top: 20px; font-size:0.85rem;">Checksum & release notes on GitHub • Built with Go + Wails • MIT License</p>
-  </div>
-
-  <!-- extra: zig detection / info -->
-  <div style="display: flex; gap: 24px; flex-wrap: wrap; justify-content: space-between; margin: 32px 0;">
-    <div style="flex:1; background:#11131f; border-radius: 24px; padding: 20px;">
-      <h3>Smart Zig detection</h3>
-      <p style="margin-top: 12px;">PATH → Windows Registry (HKCU) → AppData\Local\zig → fixed paths → home directory scan. If not found, click Zig badge → browse or retry.</p>
-    </div>
-    <div style="flex:1; background:#11131f; border-radius: 24px; padding: 20px;">
-      <h3> Build from source</h3>
-      <p style="margin-top: 12px;">Requires Go 1.21+, Wails, Node.js. <br> <code style="background:#1e1f2c; padding:4px 10px; border-radius:12px;">git clone https://github.com/CzaxStudio/Ferrum-Studio && wails dev</code></p>
-    </div>
-  </div>
-
-  <!-- Thanks & footer -->
-  <footer>
-    <p style="display: flex; justify-content: center; gap: 20px; flex-wrap: wrap;">
-      <span>⬡ Ferrum Studio — “Ferrum” is Latin for iron, the strength of steel.</span>
-      <span><a href="https://ziglang.org" style="color:#f97316;" target="_blank">ziglang.org</a> · <a href="https://wails.io" style="color:#f97316;" target="_blank">wails.io</a></span>
-    </p>
-    <p style="margin-top: 20px;">Built with ♥ for the Zig community • Special thanks to Claude AI (assistance with JS) and Stack Overflow.</p>
-    <p style="margin-top: 12px; font-size: 0.8rem;">MIT License • © CzaxStudio 2026</p>
-  </footer>
 </div>
+
+<script>
+    (function() {
+        // ----- OS detection (no emojis, clean) -----
+        const userAgent = navigator.userAgent.toLowerCase();
+        let detectedOS = 'unknown';
+        let osReadable = 'your operating system';
+        let isWindows = false, isMac = false, isLinux = false;
+
+        if (userAgent.indexOf('win') !== -1) {
+            detectedOS = 'windows';
+            osReadable = 'Windows';
+            isWindows = true;
+        } else if (userAgent.indexOf('mac') !== -1 || userAgent.indexOf('darwin') !== -1) {
+            detectedOS = 'macos';
+            osReadable = 'macOS';
+            isMac = true;
+        } else if (userAgent.indexOf('linux') !== -1 || userAgent.indexOf('x11') !== -1 || userAgent.indexOf('ubuntu') !== -1) {
+            detectedOS = 'linux';
+            osReadable = 'Linux';
+            isLinux = true;
+        } else {
+            // fallback using platform
+            const plat = navigator.platform ? navigator.platform.toLowerCase() : '';
+            if (plat.indexOf('win') !== -1) { detectedOS = 'windows'; osReadable = 'Windows'; isWindows = true; }
+            else if (plat.indexOf('mac') !== -1) { detectedOS = 'macos'; osReadable = 'macOS'; isMac = true; }
+            else if (plat.indexOf('linux') !== -1) { detectedOS = 'linux'; osReadable = 'Linux'; isLinux = true; }
+        }
+
+        // Direct download URL for Windows stable
+        const WINDOWS_DOWNLOAD_URL = "https://github.com/CzaxStudio/Ferrum-Studio/releases/download/Windows/ferrum-ide-v0.7.exe";
+        const GITHUB_RELEASES = "https://github.com/CzaxStudio/Ferrum-Studio/releases";
+        const GITHUB_REPO = "https://github.com/CzaxStudio/Ferrum-Studio";
+
+        // DOM elements
+        const detectedLabel = document.getElementById('detectedOsLabel');
+        const osNameSpan = document.getElementById('osNameSpan');
+        const downloadHeadingSpan = document.getElementById('downloadHeadingText');
+        const primaryBtn = document.getElementById('primaryDownloadBtn');
+        const manualAltLink = document.getElementById('manualAlternativeLink');
+        const platformNoteDiv = document.getElementById('platformNote');
+
+        if (detectedLabel) detectedLabel.innerText = osReadable;
+        if (osNameSpan) osNameSpan.innerText = osReadable;
+        if (downloadHeadingSpan) {
+            // ensure heading text: "Ferrum Studio for <OS>"
+            const baseText = "Ferrum Studio for ";
+            if (downloadHeadingSpan.innerText.includes('Ferrum Studio for')) {
+                // fine
+            } else {
+                downloadHeadingSpan.innerHTML = `Ferrum Studio for <span id="osNameSpan">${osReadable}</span>`;
+            }
+        }
+
+        function updateUIByOS() {
+            if (detectedOS === 'windows') {
+                if (primaryBtn) {
+                    primaryBtn.innerHTML = `<span>↓</span> Download Ferrum Studio for Windows`;
+                    primaryBtn.onclick = (e) => {
+                        e.preventDefault();
+                        window.location.href = WINDOWS_DOWNLOAD_URL;
+                    };
+                }
+                if (manualAltLink) {
+                    manualAltLink.href = WINDOWS_DOWNLOAD_URL;
+                    manualAltLink.innerText = 'windows .exe (v0.7)';
+                }
+                if (platformNoteDiv) {
+                    platformNoteDiv.innerHTML = `Windows native build (v0.7) ready. Nim compiler required. macOS and Linux builds planned — check GitHub releases.`;
+                }
+            } 
+            else if (detectedOS === 'macos') {
+                if (primaryBtn) {
+                    primaryBtn.innerHTML = `<span>⌘</span> Download for macOS (coming soon)`;
+                    primaryBtn.onclick = (e) => {
+                        e.preventDefault();
+                        window.open(GITHUB_RELEASES, '_blank');
+                        showTemporaryMessage('macOS native build is in active development — follow the repository for updates.', '#2c364c');
+                    };
+                }
+                if (manualAltLink) {
+                    manualAltLink.href = GITHUB_RELEASES;
+                    manualAltLink.innerText = 'view all builds (GitHub)';
+                }
+                if (platformNoteDiv) {
+                    platformNoteDiv.innerHTML = `macOS build is under active development. Meanwhile, you can build from source or use the Windows release via virtualization. Nim compiler is required.`;
+                }
+            } 
+            else if (detectedOS === 'linux') {
+                if (primaryBtn) {
+                    primaryBtn.innerHTML = `<span>🐚</span> Download for Linux (native soon)`;
+                    primaryBtn.onclick = (e) => {
+                        e.preventDefault();
+                        window.open(GITHUB_RELEASES, '_blank');
+                        showTemporaryMessage('Linux prebuilt binaries are not yet released — you can compile from source using wails. Star the repo for updates.', '#2f3a4c');
+                    };
+                }
+                if (manualAltLink) {
+                    manualAltLink.href = GITHUB_RELEASES;
+                    manualAltLink.innerText = 'github releases · source';
+                }
+                if (platformNoteDiv) {
+                    platformNoteDiv.innerHTML = `Linux build instructions available in the repository. Native AppImage / deb package planned. Nim & Go toolchain required for building from source.`;
+                }
+            } 
+            else {
+                // fallback for unknown
+                if (primaryBtn) {
+                    primaryBtn.innerHTML = `<span>↓</span> Download Ferrum Studio`;
+                    primaryBtn.onclick = (e) => {
+                        e.preventDefault();
+                        window.open(GITHUB_RELEASES, '_blank');
+                    };
+                }
+                if (manualAltLink) {
+                    manualAltLink.href = GITHUB_RELEASES;
+                    manualAltLink.innerText = 'see all releases';
+                }
+                if (platformNoteDiv) {
+                    platformNoteDiv.innerHTML = `Windows build is available. For other systems, please refer to GitHub repository. Nim 1.6+ required.`;
+                }
+            }
+
+            // Add extra windows link if OS is not windows but user may want windows build anyway
+            if (detectedOS !== 'windows') {
+                const secContainer = document.querySelector('.secondary-links');
+                const existingExtra = document.getElementById('extraWinLink');
+                if (secContainer && !existingExtra) {
+                    const extraWin = document.createElement('a');
+                    extraWin.id = 'extraWinLink';
+                    extraWin.href = WINDOWS_DOWNLOAD_URL;
+                    extraWin.className = 'link-outline';
+                    extraWin.innerText = 'windows exe (direct)';
+                    extraWin.style.marginLeft = '0';
+                    secContainer.appendChild(extraWin);
+                }
+            }
+        }
+
+        function showTemporaryMessage(msg, bgColor) {
+            const toast = document.createElement('div');
+            toast.textContent = msg;
+            toast.style.position = 'fixed';
+            toast.style.bottom = '24px';
+            toast.style.left = '24px';
+            toast.style.right = 'auto';
+            toast.style.backgroundColor = bgColor || '#1a2332';
+            toast.style.color = '#f0f3fc';
+            toast.style.padding = '8px 18px';
+            toast.style.borderRadius = '40px';
+            toast.style.fontSize = '0.75rem';
+            toast.style.fontFamily = 'Inter, system-ui';
+            toast.style.border = '1px solid #3a4a6e';
+            toast.style.zIndex = '1000';
+            toast.style.backdropFilter = 'blur(4px)';
+            document.body.appendChild(toast);
+            setTimeout(() => { if(toast && toast.remove) toast.remove(); }, 3800);
+        }
+
+        // also update the manual alternative link text and behavior for consistency
+        function finalizeManualLink() {
+            if (manualAltLink && detectedOS !== 'windows') {
+                // keep as is but also ensure it directs correctly
+                if (!manualAltLink.getAttribute('href') || manualAltLink.getAttribute('href') === '#') {
+                    manualAltLink.href = GITHUB_RELEASES;
+                    manualAltLink.innerText = 'all releases (github)';
+                }
+            }
+            if (manualAltLink && detectedOS === 'windows') {
+                manualAltLink.href = WINDOWS_DOWNLOAD_URL;
+                manualAltLink.innerText = 'direct windows .exe (v0.7)';
+            }
+        }
+
+        updateUIByOS();
+        finalizeManualLink();
+
+        // if any inconsistencies with nim note
+        const existingNote = document.querySelector('.info-note');
+        if (existingNote && detectedOS === 'windows') {
+            // still show nim requirement
+            if (!existingNote.innerHTML.includes('Nim compiler')) {
+                existingNote.innerHTML += ' · Nim compiler (1.6+ or 2.x) required.';
+            }
+        } else if (existingNote && detectedOS !== 'windows') {
+            // already fine
+        }
+    })();
+</script>
 </body>
 </html>
