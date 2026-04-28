@@ -24,6 +24,8 @@ Ferrum Studio is a lightweight, native desktop IDE designed from the ground up f
 
 Most editors treat Nim as an afterthought — a language server plugin bolted onto a general-purpose tool. Ferrum Studio is different. Every feature, shortcut, snippet, error message, and template is designed around the way Nim developers actually work.
 
+*Note --> The IDE is still in v0.7
+
 ---
 
 ## Screenshots
