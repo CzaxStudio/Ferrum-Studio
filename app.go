@@ -785,7 +785,7 @@ echo "Hello from Nim!"
 	}
 	nimbleContent := fmt.Sprintf(`# Package
 version = "0.1.0"
-author = "Your Name"
+author = "Czax"
 description = "A new Nim project"
 license = "MIT"
 srcDir = "src"
