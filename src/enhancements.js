@@ -1,92 +1,61 @@
 // ══════════════════════════════════════════════════════════════════════════════
 //  FERRUM STUDIO — enhancements.js
-//  • Project Templates (real, production-quality starters)
-//  • Human-readable error explanations + fix suggestions
-//  • Called from main.js — no global state needed except DOM helpers
+//  • Project Templates (real Nim starters)
+//  • Human-readable Nim error explanations + fix suggestions
 // ══════════════════════════════════════════════════════════════════════════════
 
 // ── Project Templates ─────────────────────────────────────────────────────────
-// Real, working Zig project templates. Each produces multiple files.
 export const TEMPLATES = [
   {
     id: 'exe',
     name: 'Executable',
     icon: '⚡',
-    desc: 'A runnable command-line program with argument parsing',
+    desc: 'A command-line program with argument parsing and nimble build file',
     files: {
-      'src/main.zig': `const std = @import("std");
+      'src/main.nim': `import std/os
+import std/strutils
 
-pub fn main() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
-    const alloc = gpa.allocator();
+proc main() =
+  let args = commandLineParams()
+  if args.len == 0:
+    echo "Usage: " & getAppFilename() & " <name>"
+    quit(1)
+  echo "Hello, " & args[0] & "!"
 
-    const args = try std.process.argsAlloc(alloc);
-    defer std.process.argsFree(alloc, args);
-
-    const stdout = std.io.getStdOut().writer();
-
-    if (args.len < 2) {
-        try stdout.print("Usage: {s} <name>\\n", .{args[0]});
-        return;
-    }
-
-    try stdout.print("Hello, {s}!\\n", .{args[1]});
-}
+main()
 `,
-      'build.zig': `const std = @import("std");
+      'myapp.nimble': `# Package
+version       = "0.1.0"
+author        = "Your Name"
+description   = "A Nim command-line application"
+license       = "MIT"
+srcDir        = "src"
+bin           = @["main"]
 
-pub fn build(b: *std.Build) void {
-    const target = b.standardTargetOptions(.{});
-    const optimize = b.standardOptimizeOption(.{});
-
-    const exe = b.addExecutable(.{
-        .name = "myapp",
-        .root_source_file = b.path("src/main.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-    b.installArtifact(exe);
-
-    const run_cmd = b.addRunArtifact(exe);
-    run_cmd.step.dependOn(b.getInstallStep());
-    if (b.args) |args| run_cmd.addArgs(args);
-
-    const run_step = b.step("run", "Run the app");
-    run_step.dependOn(&run_cmd.step);
-
-    const unit_tests = b.addTest(.{
-        .root_source_file = b.path("src/main.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-    const run_unit_tests = b.addRunArtifact(unit_tests);
-    const test_step = b.step("test", "Run unit tests");
-    test_step.dependOn(&run_unit_tests.step);
-}
+# Dependencies
+requires "nim >= 2.0.0"
 `,
-      'build.zig.zon': `\`{'
-    .name = .myapp,
-    .version = "0.1.0",
-    .minimum_zig_version = "0.13.0",
-    .dependencies = .{},
-    .paths = .{ "build.zig", "build.zig.zon", "src" },
-}
+      'config.nims': `# NimScript build configuration
+switch("opt", "speed")
+switch("gc", "refc")
 `,
       'README.md': `# myapp
 
-A Zig command-line application.
+A Nim command-line application.
 
 ## Build & Run
 
 \`\`\`bash
-zig build run -- World
+nimble build
+./main World
+# or run directly:
+nim r src/main.nim World
 \`\`\`
 
 ## Test
 
 \`\`\`bash
-zig build test
+nimble test
 \`\`\`
 `,
     },
@@ -96,375 +65,305 @@ zig build test
     id: 'lib',
     name: 'Library',
     icon: '📦',
-    desc: 'A reusable Zig library with a clean public API',
+    desc: 'A reusable Nim library with public API and tests',
     files: {
-      'src/root.zig': `//! A reusable Zig library.
-//! Import with: const mylib = @import("mylib");
+      'src/mylib.nim': `## mylib — a reusable Nim library.
+## Import with: import mylib
 
-const std = @import("std");
+proc add*(a, b: int): int =
+  ## Add two integers together.
+  a + b
 
-/// Add two numbers together.
-pub fn add(a: i64, b: i64) i64 {
-    return a + b;
-}
+proc multiply*(a, b: int): int =
+  ## Multiply two integers.
+  a * b
 
-/// Multiply two numbers.
-pub fn multiply(a: i64, b: i64) i64 {
-    return a * b;
-}
+type
+  Buffer* = object
+    ## A growable buffer that owns its memory.
+    data*: seq[byte]
 
-/// A growable buffer that owns its memory.
-pub const Buffer = struct {
-    data: []u8,
-    len: usize,
-    allocator: std.mem.Allocator,
+proc newBuffer*(): Buffer =
+  ## Create an empty Buffer.
+  Buffer(data: @[])
 
-    pub fn init(allocator: std.mem.Allocator) Buffer {
-        return .{ .data = &.{}, .len = 0, .allocator = allocator };
-    }
+proc add*(buf: var Buffer, bytes: openArray[byte]) =
+  ## Append bytes to the buffer.
+  for b in bytes: buf.data.add(b)
 
-    pub fn deinit(self: *Buffer) void {
-        if (self.data.len > 0) self.allocator.free(self.data);
-    }
+proc add*(buf: var Buffer, s: string) =
+  ## Append a string to the buffer.
+  for c in s: buf.data.add(byte(c))
 
-    pub fn append(self: *Buffer, bytes: []const u8) !void {
-        const new_len = self.len + bytes.len;
-        if (new_len > self.data.len) {
-            const new_cap = @max(new_len, self.data.len * 2 + 8);
-            self.data = try self.allocator.realloc(self.data, new_cap);
-        }
-        @memcpy(self.data[self.len..][0..bytes.len], bytes);
-        self.len = new_len;
-    }
+proc len*(buf: Buffer): int = buf.data.len
 
-    pub fn slice(self: Buffer) []const u8 {
-        return self.data[0..self.len];
-    }
-};
-
-test "add works" {
-    try std.testing.expectEqual(@as(i64, 5), add(2, 3));
-}
-
-test "Buffer append" {
-    var buf = Buffer.init(std.testing.allocator);
-    defer buf.deinit();
-    try buf.append("Hello");
-    try buf.append(", World!");
-    try std.testing.expectEqualStrings("Hello, World!", buf.slice());
-}
+proc toString*(buf: Buffer): string =
+  ## Convert buffer contents to a string.
+  result = newString(buf.data.len)
+  for i, b in buf.data: result[i] = char(b)
 `,
-      'build.zig': `const std = @import("std");
+      'tests/test_mylib.nim': `import unittest
+import mylib
 
-pub fn build(b: *std.Build) void {
-    const target = b.standardTargetOptions(.{});
-    const optimize = b.standardOptimizeOption(.{});
+suite "mylib tests":
+  test "add works":
+    check add(2, 3) == 5
+    check add(-1, 1) == 0
 
-    const lib = b.addStaticLibrary(.{
-        .name = "mylib",
-        .root_source_file = b.path("src/root.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-    b.installArtifact(lib);
+  test "multiply works":
+    check multiply(3, 4) == 12
 
-    const lib_unit_tests = b.addTest(.{
-        .root_source_file = b.path("src/root.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-    const run_lib_unit_tests = b.addRunArtifact(lib_unit_tests);
-    const test_step = b.step("test", "Run library tests");
-    test_step.dependOn(&run_lib_unit_tests.step);
-}
+  test "Buffer append":
+    var buf = newBuffer()
+    buf.add("Hello")
+    buf.add(", World!")
+    check buf.toString() == "Hello, World!"
+    check buf.len == 13
 `,
-      'build.zig.zon': `.{
-    .name = .mylib,
-    .version = "0.1.0",
-    .minimum_zig_version = "0.13.0",
-    .dependencies = .{},
-    .paths = .{ "build.zig", "build.zig.zon", "src" },
-}
+      'mylib.nimble': `# Package
+version       = "0.1.0"
+author        = "Your Name"
+description   = "A reusable Nim library"
+license       = "MIT"
+srcDir        = "src"
+
+# Dependencies
+requires "nim >= 2.0.0"
+
+task test, "Run the tests":
+  exec "nim r tests/test_mylib.nim"
 `,
     },
   },
 
   {
     id: 'server',
-    name: 'TCP Server',
+    name: 'HTTP Server',
     icon: '🌐',
-    desc: 'A basic TCP server that handles connections',
+    desc: 'An async HTTP server using std/asynchttpserver',
     files: {
-      'src/main.zig': `const std = @import("std");
-const net = std.net;
+      'src/main.nim': `import std/asynchttpserver
+import std/asyncdispatch
+import std/strutils
+import std/json
 
-pub fn main() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
-    const alloc = gpa.allocator();
+let server = newAsyncHttpServer()
 
-    const addr = try net.Address.parseIp("127.0.0.1", 8080);
-    var server = try addr.listen(.{ .reuse_address = true });
-    defer server.deinit();
+proc handler(req: Request) {.async.} =
+  let headers = newHttpHeaders([("Content-Type", "text/plain")])
+  case req.url.path
+  of "/":
+    await req.respond(Http200, "Hello from Ferrum Studio Nim Server!\n", headers)
+  of "/json":
+    let jsonHeaders = newHttpHeaders([("Content-Type", "application/json")])
+    let body = $ %* {"message": "Hello!", "nim": NimVersion}
+    await req.respond(Http200, body, jsonHeaders)
+  of "/echo":
+    await req.respond(Http200, req.body & "\n", headers)
+  else:
+    await req.respond(Http404, "Not Found\n", headers)
 
-    std.debug.print("Listening on http://127.0.0.1:8080\\n", .{});
+proc main() {.async.} =
+  echo "Server running on http://localhost:8080"
+  server.listen(Port(8080))
+  while true:
+    if server.shouldAcceptRequest():
+      await server.acceptRequest(handler)
+    else:
+      await sleepAsync(500)
 
-    while (true) {
-        const conn = try server.accept();
-        const thread = try std.Thread.spawn(.{}, handleConn, .{ conn, alloc });
-        thread.detach();
-    }
-}
-
-fn handleConn(conn: net.Server.Connection, alloc: std.mem.Allocator) void {
-    defer conn.stream.close();
-    _ = alloc;
-
-    var buf: [4096]u8 = undefined;
-    const n = conn.stream.read(&buf) catch return;
-    const request = buf[0..n];
-
-    // Simple HTTP response
-    const body = "Hello from Zig!\\n";
-    const response = std.fmt.allocPrint(std.heap.page_allocator,
-        "HTTP/1.1 200 OK\\r\\nContent-Length: {}\\r\\nContent-Type: text/plain\\r\\n\\r\\n{s}",
-        .{ body.len, body }) catch return;
-    defer std.heap.page_allocator.free(response);
-
-    _ = request; // suppress unused warning
-    conn.stream.writeAll(response) catch {};
-}
+waitFor main()
 `,
-      'build.zig': `const std = @import("std");
+      'server.nimble': `# Package
+version       = "0.1.0"
+author        = "Your Name"
+description   = "A Nim async HTTP server"
+license       = "MIT"
+srcDir        = "src"
+bin           = @["main"]
 
-pub fn build(b: *std.Build) void {
-    const target = b.standardTargetOptions(.{});
-    const optimize = b.standardOptimizeOption(.{});
-    const exe = b.addExecutable(.{
-        .name = "server",
-        .root_source_file = b.path("src/main.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-    b.installArtifact(exe);
-    const run_cmd = b.addRunArtifact(exe);
-    run_cmd.step.dependOn(b.getInstallStep());
-    const run_step = b.step("run", "Run the server");
-    run_step.dependOn(&run_cmd.step);
-}
+requires "nim >= 2.0.0"
 `,
     },
   },
 
   {
-    id: 'embedded',
-    name: 'Embedded / Bare-Metal',
+    id: 'cli',
+    name: 'CLI Tool',
     icon: '🔧',
-    desc: 'Freestanding Zig for microcontrollers (no OS, no libc)',
+    desc: 'A full-featured CLI tool using parseopt',
     files: {
-      'src/main.zig': `// Bare-metal Zig — no OS, no libc, no std.
-// Runs on any CPU target with linker script.
-//
-// Build with: zig build-exe src/main.zig -target thumb-freestanding-eabi ...
+      'src/main.nim': `## A CLI tool built with Nim.
+## Usage: mytool [options] <input>
 
-const UART_BASE: u32 = 0x40011000; // Example: STM32 USART1
+import std/os
+import std/parseopt
+import std/strutils
 
-const Uart = struct {
-    fn init() void {
-        // Configure UART peripheral (chip-specific)
-        // This is a placeholder — replace with your MCU's init sequence
-    }
+type
+  Config = object
+    verbose: bool
+    output:  string
+    input:   string
 
-    fn writeByte(b: u8) void {
-        // Wait for TX empty, then write
-        const DR = @as(*volatile u32, @ptrFromInt(UART_BASE + 0x04));
-        DR.* = b;
-    }
+proc parseArgs(): Config =
+  result = Config(output: "output.txt")
+  var p = initOptParser(commandLineParams())
 
-    fn writeStr(s: []const u8) void {
-        for (s) |c| writeByte(c);
-    }
-};
+  while true:
+    p.next()
+    case p.kind
+    of cmdEnd: break
+    of cmdShortOption, cmdLongOption:
+      case p.key
+      of "v", "verbose": result.verbose = true
+      of "o", "output":  result.output  = p.val
+      of "h", "help":
+        echo """Usage: mytool [options] <input>
 
-// Entry point — called by startup code or linker _start
-export fn main() noreturn {
-    Uart.init();
-    Uart.writeStr("Ferrum Studio — Zig Embedded\\r\\n");
+Options:
+  -v, --verbose    Verbose output
+  -o, --output     Output file (default: output.txt)
+  -h, --help       Show this help"""
+        quit(0)
+      else:
+        echo "Unknown option: " & p.key
+        quit(1)
+    of cmdArgument:
+      result.input = p.key
 
-    var counter: u32 = 0;
-    while (true) {
-        counter +%= 1;
-        // Busy-wait delay
-        var i: u32 = 0;
-        while (i < 1_000_000) : (i += 1) {}
-        Uart.writeStr("tick\\r\\n");
-    }
-}
+proc main() =
+  let cfg = parseArgs()
 
-// Panic handler — required for freestanding targets
-pub fn panic(msg: []const u8, _: ?*@import("std").builtin.StackTrace, _: ?usize) noreturn {
-    Uart.writeStr("PANIC: ");
-    Uart.writeStr(msg);
-    while (true) {}
-}
+  if cfg.input.len == 0:
+    echo "Error: no input file specified. Use --help for usage."
+    quit(1)
+
+  if cfg.verbose:
+    echo "Input:   " & cfg.input
+    echo "Output:  " & cfg.output
+
+  if not fileExists(cfg.input):
+    echo "Error: file not found: " & cfg.input
+    quit(1)
+
+  let content = readFile(cfg.input)
+  writeFile(cfg.output, content.toUpper())
+
+  if cfg.verbose:
+    echo "Done. Wrote " & $content.len & " bytes to " & cfg.output
+  else:
+    echo "Done."
+
+main()
 `,
-      'build.zig': `const std = @import("std");
+      'mytool.nimble': `# Package
+version       = "0.1.0"
+author        = "Your Name"
+description   = "A Nim CLI tool"
+license       = "MIT"
+srcDir        = "src"
+bin           = @["main"]
 
-pub fn build(b: *std.Build) void {
-    // Change this target to match your MCU
-    const target = b.resolveTargetQuery(.{
-        .cpu_arch = .thumb,
-        .os_tag = .freestanding,
-        .abi = .eabi,
-        .cpu_model = .{ .explicit = &std.Target.arm.cpu.cortex_m4 },
-    });
-
-    const exe = b.addExecutable(.{
-        .name = "firmware",
-        .root_source_file = b.path("src/main.zig"),
-        .target = target,
-        .optimize = .ReleaseSmall,
-        .single_threaded = true,
-    });
-
-    // Link with your linker script
-    // exe.setLinkerScriptPath(b.path("linker.ld"));
-
-    b.installArtifact(exe);
-}
+requires "nim >= 2.0.0"
 `,
     },
   },
 
   {
-    id: 'comptime',
-    name: 'Comptime Metaprogramming',
+    id: 'macro',
+    name: 'Macro / Metaprogramming',
     icon: '🧩',
-    desc: 'Demonstrates comptime generics, reflection, and code generation',
+    desc: 'Demonstrates Nim macros, templates, and compile-time features',
     files: {
-      'src/main.zig': `//! Zig comptime metaprogramming examples.
-//! Zig uses comptime instead of macros/templates/generics.
+      'src/main.nim': `## Nim metaprogramming examples.
+## Nim macros operate on the AST at compile time.
 
-const std = @import("std");
+import std/macros
+import std/strutils
+import std/tables
 
-// ── Generic Stack ─────────────────────────────────────────────────────────────
-// Comptime type parameter — fully specialized at compile time, zero overhead.
-pub fn Stack(comptime T: type) type {
-    return struct {
-        items: []T,
-        top: usize,
-        alloc: std.mem.Allocator,
+# ── Template: simple code reuse ──────────────────────────────────────────────
+template repeat*(n: int, body: untyped) =
+  ## Repeat body n times.
+  for _ in 0..<n:
+    body
 
-        const Self = @This();
+# ── Template: timed block ─────────────────────────────────────────────────────
+import std/times
 
-        pub fn init(alloc: std.mem.Allocator, cap: usize) !Self {
-            return .{
-                .items = try alloc.alloc(T, cap),
-                .top = 0,
-                .alloc = alloc,
-            };
-        }
+template timed*(label: string, body: untyped) =
+  ## Print how long a block takes.
+  let t0 = cpuTime()
+  body
+  echo label & ": " & $(cpuTime() - t0) & "s"
 
-        pub fn deinit(self: *Self) void { self.alloc.free(self.items); }
+# ── Macro: generate getter/setter pairs ──────────────────────────────────────
+macro properties*(T: typedesc, fields: untyped): untyped =
+  ## Generate typed getter and setter procs for an object's fields.
+  result = newStmtList()
+  for field in fields:
+    let name = field[0]
+    let typ  = field[1]
+    result.add quote do:
+      proc \`name\`*(self: \`T\`): \`typ\` = self.\`name\`
+      proc \`name\`*(self: var \`T\`, val: \`typ\`) = self.\`name\` = val
 
-        pub fn push(self: *Self, val: T) !void {
-            if (self.top >= self.items.len) return error.Overflow;
-            self.items[self.top] = val;
-            self.top += 1;
-        }
+# ── Compile-time string table ─────────────────────────────────────────────────
+const HTTP_CODES = {
+  200: "OK",
+  201: "Created",
+  400: "Bad Request",
+  401: "Unauthorized",
+  403: "Forbidden",
+  404: "Not Found",
+  500: "Internal Server Error",
+}.toTable()
 
-        pub fn pop(self: *Self) ?T {
-            if (self.top == 0) return null;
-            self.top -= 1;
-            return self.items[self.top];
-        }
+proc statusText*(code: int): string =
+  HTTP_CODES.getOrDefault(code, "Unknown")
 
-        pub fn peek(self: Self) ?T {
-            return if (self.top > 0) self.items[self.top - 1] else null;
-        }
-    };
-}
+# ── Generic stack ─────────────────────────────────────────────────────────────
+type
+  Stack*[T] = object
+    items: seq[T]
 
-// ── Compile-time field iteration ──────────────────────────────────────────────
-// Print all fields and their types of any struct at runtime.
-pub fn printFields(comptime T: type) void {
-    const info = @typeInfo(T);
-    inline for (info.@"struct".fields) |f| {
-        std.debug.print("  {s}: {s}\\n", .{ f.name, @typeName(f.type) });
-    }
-}
+proc newStack*[T](): Stack[T] = Stack[T](items: @[])
+proc push*[T](s: var Stack[T], val: T) = s.items.add(val)
+proc pop*[T](s: var Stack[T]): T =
+  if s.items.len == 0: raise newException(ValueError, "empty stack")
+  result = s.items[^1]
+  s.items.setLen(s.items.len - 1)
+proc peek*[T](s: Stack[T]): T = s.items[^1]
+proc len*[T](s: Stack[T]): int = s.items.len
 
-// ── Compile-time string switch ─────────────────────────────────────────────────
-pub fn httpStatusText(code: u16) []const u8 {
-    return switch (code) {
-        200 => "OK",
-        201 => "Created",
-        400 => "Bad Request",
-        401 => "Unauthorized",
-        403 => "Forbidden",
-        404 => "Not Found",
-        500 => "Internal Server Error",
-        else => "Unknown",
-    };
-}
+# ── Main ──────────────────────────────────────────────────────────────────────
+proc main() =
+  # Template usage
+  repeat(3):
+    echo "Hello from template!"
 
-// ── Comptime array generation ─────────────────────────────────────────────────
-// Generates a lookup table at compile time — zero runtime cost.
-const SQUARES: [16]u32 = blk: {
-    var arr: [16]u32 = undefined;
-    for (&arr, 0..) |*v, i| v.* = i * i;
-    break :blk arr;
-};
+  timed("Generic Stack"):
+    var s = newStack[int]()
+    for i in 1..100:
+      s.push(i)
+    while s.len > 0:
+      discard s.pop()
 
-pub fn main() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
-    const alloc = gpa.allocator();
+  echo "HTTP 404: " & statusText(404)
+  echo "HTTP 200: " & statusText(200)
 
-    // Generic Stack
-    var s = try Stack(i32).init(alloc, 8);
-    defer s.deinit();
-    try s.push(10);
-    try s.push(20);
-    try s.push(30);
-    std.debug.print("Stack peek: {}\\n", .{s.peek().?});
-    std.debug.print("Stack pop:  {}\\n", .{s.pop().?});
-
-    // Comptime field info
-    const Point = struct { x: f32, y: f32, label: []const u8 };
-    std.debug.print("Fields of Point:\\n", .{});
-    printFields(Point);
-
-    // Comptime squares table
-    std.debug.print("Squares 0..7: ", .{});
-    for (SQUARES[0..8]) |sq| std.debug.print("{} ", .{sq});
-    std.debug.print("\\n", .{});
-
-    // HTTP status
-    std.debug.print("HTTP 404: {s}\\n", .{httpStatusText(404)});
-}
-
-test "Stack works" {
-    var s = try Stack(u8).init(std.testing.allocator, 4);
-    defer s.deinit();
-    try s.push(1);
-    try s.push(2);
-    try std.testing.expectEqual(@as(?u8, 2), s.pop());
-    try std.testing.expectEqual(@as(?u8, 1), s.pop());
-    try std.testing.expectEqual(@as(?u8, null), s.pop());
-}
+main()
 `,
-      'build.zig': `const std = @import("std");
-pub fn build(b: *std.Build) void {
-    const t = b.standardTargetOptions(.{});
-    const o = b.standardOptimizeOption(.{});
-    const exe = b.addExecutable(.{ .name="comptime-demo", .root_source_file=b.path("src/main.zig"), .target=t, .optimize=o });
-    b.installArtifact(exe);
-    const run = b.addRunArtifact(exe); run.step.dependOn(b.getInstallStep());
-    b.step("run","Run").dependOn(&run.step);
-    const tests = b.addTest(.{ .root_source_file=b.path("src/main.zig"), .target=t, .optimize=o });
-    b.step("test","Test").dependOn(&b.addRunArtifact(tests).step);
-}
+      'metaprog.nimble': `# Package
+version       = "0.1.0"
+author        = "Your Name"
+description   = "Nim metaprogramming examples"
+license       = "MIT"
+srcDir        = "src"
+bin           = @["main"]
+
+requires "nim >= 2.0.0"
 `,
     },
   },
@@ -509,9 +408,7 @@ export function buildTemplateDialog() {
   return dlg
 }
 
-// Called when user picks a template — creates files and opens them
 async function applyTemplate(tpl) {
-  // Get the Go bridge
   const goFn = (method, ...args) => {
     const fn = window?.go?.main?.App?.[method]
     if (fn) return fn(...args)
@@ -520,7 +417,7 @@ async function applyTemplate(tpl) {
 
   const root = await goFn('GetProjectRoot') || ''
   if (!root) {
-    alert('Please open a project folder first (File → Open Folder)')
+    alert('Please open a project folder first (File -> Open Folder)')
     return
   }
 
@@ -529,192 +426,154 @@ async function applyTemplate(tpl) {
 
   for (const [relPath, content] of Object.entries(tpl.files)) {
     const fullPath = root + sep + relPath.replace(/\//g, sep)
-    // Ensure directory exists
     const dir = fullPath.substring(0, fullPath.lastIndexOf(sep))
     await goFn('CreateDir', dir)
     const err = await goFn('WriteFile', fullPath, content)
     if (!err) created.push({ path: fullPath, name: relPath.split('/').pop(), content })
   }
 
-  // Fire custom event so main.js can open the files and refresh tree
   window.dispatchEvent(new CustomEvent('ferrum:template-applied', {
     detail: { template: tpl, files: created, root }
   }))
 }
 
-// ── Human-readable error explanations ────────────────────────────────────────
-// Maps Zig compiler error patterns to human explanations + fix suggestions.
-// The key is a regex that matches the error message.
-const ZIG_ERROR_EXPLANATIONS = [
+// ── Nim error explanations ────────────────────────────────────────────────────
+const NIM_ERROR_EXPLANATIONS = [
   // ── Type errors ──────────────────────────────────────────────────────────
   {
-    match: /expected type '(.+?)', found '(.+?)'/,
+    match: /type mismatch: got <(.+?)> but expected <(.+?)>/,
     title: 'Type mismatch',
-    explain: (m) => `You gave a value of type \`${m[2]}\` but the code expects type \`${m[1]}\`.`,
-    fix: (m) => `Cast or convert the value: try \`@as(${m[1]}, value)\` or \`@intCast(value)\` for integers, \`@floatCast(value)\` for floats.`,
+    explain: m => `You gave a value of type \`${m[1]}\` where type \`${m[2]}\` was expected.`,
+    fix: m => `Convert with a cast or conversion proc. E.g. \`${m[2]}(value)\`, or use \`$\` to convert to string.`,
   },
   {
-    match: /cannot assign to constant/,
-    title: 'Writing to a constant',
-    explain: () => 'You tried to assign a new value to a `const` variable. In Zig, `const` means the binding can never change.',
-    fix: () => 'Change `const` to `var` if you need to modify it. Example: `var x: i32 = 5;`',
+    match: /undeclared identifier: '(.+?)'/,
+    title: 'Unknown identifier',
+    explain: m => `Nim cannot find anything named \`${m[1]}\` in the current scope.`,
+    fix: m => `Check spelling. Did you forget to \`import\` the module? Or declare \`${m[1]}\` before using it.`,
   },
   {
-    match: /use of undeclared identifier '(.+?)'/,
-    title: 'Unknown name',
-    explain: (m) => `Zig cannot find anything named \`${m[1]}\` in the current scope.`,
-    fix: (m) => `Check spelling. Did you forget to import it? Try \`const ${m[1]} = @import("...");\` or declare it before use.`,
+    match: /attempt to assign to a .const. variable/,
+    title: 'Assigning to a constant',
+    explain: () => `You tried to assign a new value to a \`const\` or \`let\` binding. These are immutable.`,
+    fix: () => `Use \`var\` instead of \`let\` or \`const\` if you need to modify the value later.`,
   },
   {
-    match: /expected '(.+?)', found '(.+?)'\s*note: return type declared here/,
-    title: 'Wrong return type',
-    explain: (m) => `Your function says it returns \`${m[1]}\` but you are returning \`${m[2]}\`.`,
-    fix: (m) => `Either change the return statement to return \`${m[1]}\`, or update the function signature to return \`${m[2]}\`.`,
+    match: /expression '(.+?)' has no type/,
+    title: 'Expression has no type',
+    explain: m => `The expression \`${m[1]}\` doesn't produce a value that can be used here.`,
+    fix: () => `Make sure you're calling a proc that returns a value, not a void proc.`,
+  },
+  {
+    match: /value of type '(.+?)' has to be discarded/,
+    title: 'Unused return value',
+    explain: m => `A proc returned a value of type \`${m[1]}\` that you ignored.`,
+    fix: () => `Either use the return value, or explicitly discard it with \`discard yourCall()\`.`,
   },
   {
     match: /unused variable: '(.+?)'/,
     title: 'Unused variable',
-    explain: (m) => `Variable \`${m[1]}\` is declared but never read. Zig treats this as an error to prevent bugs.`,
-    fix: (m) => `Either use the variable, or replace it with \`_\` to explicitly discard it: \`_ = ${m[1]};\``,
+    explain: m => `Variable \`${m[1]}\` is declared but never used.`,
+    fix: m => `Either use the variable, or replace it with \`_\` to suppress the warning: \`let _ = ...\`.`,
+  },
+  // ── Object / field errors ─────────────────────────────────────────────────
+  {
+    match: /type '(.+?)' has no field or method named '(.+?)'/,
+    title: 'Unknown field or method',
+    explain: m => `Type \`${m[1]}\` has no field or method called \`${m[2]}\`.`,
+    fix: m => `Check the type definition for available fields. Use your IDE or \`echo typeof(obj)\` to inspect the type.`,
   },
   {
-    match: /unused function parameter: '(.+?)'/,
-    title: 'Unused function parameter',
-    explain: (m) => `Parameter \`${m[1]}\` is never used inside the function.`,
-    fix: (m) => `Add \`_ = ${m[1]};\` at the top of the function to mark it intentionally unused.`,
+    match: /object has no field named '(.+?)'/,
+    title: 'Unknown object field',
+    explain: m => `The object has no field called \`${m[1]}\`.`,
+    fix: () => `Check the object definition. Field names are case-sensitive in Nim.`,
   },
-  // ── Error handling ────────────────────────────────────────────────────────
+  // ── Module / import errors ────────────────────────────────────────────────
   {
-    match: /error is discarded/,
-    title: 'Error not handled',
-    explain: () => 'This expression can return an error but you are ignoring it.',
-    fix: () => 'Handle the error with `try` (propagates to caller), `catch` (handle inline), or `catch unreachable` (crash in debug). Example: `const val = try someFunc();`',
-  },
-  {
-    match: /error union '(.+?)' is not an error/,
-    title: 'Unnecessary error union',
-    explain: () => 'You used `!T` (error union) but the type cannot actually produce an error here.',
-    fix: () => 'Remove the `!` from the type. Change `!T` to just `T`.',
+    match: /cannot open '(.+?)'/,
+    title: 'Module not found',
+    explain: m => `Nim could not find the module \`${m[1]}\`.`,
+    fix: m => `Check the import path. For stdlib use \`import std/${m[1]}\`. For nimble packages, add them to your \`.nimble\` file and run \`nimble install\`.`,
   },
   {
-    match: /cannot store runtime value in compile-time variable/,
-    title: 'Comptime/runtime mismatch',
-    explain: () => 'You tried to store a runtime-computed value into a `comptime` variable.',
-    fix: () => 'Either make the value comptime-known (use `comptime` expressions), or change the variable to `var` instead of `comptime var`.',
+    match: /ambiguous identifier: '(.+?)'/,
+    title: 'Ambiguous identifier',
+    explain: m => `The name \`${m[1]}\` exists in multiple imported modules.`,
+    fix: m => `Qualify it with the module name: \`moduleName.${m[1]}\`.`,
   },
-  // ── Memory / pointer errors ───────────────────────────────────────────────
+  // ── Nil / ref errors ──────────────────────────────────────────────────────
   {
-    match: /expected pointer, found '(.+?)'/,
-    title: 'Expected a pointer',
-    explain: (m) => `The code expects a pointer (\`*T\`) but you passed \`${m[1]}\` (a value, not a pointer).`,
-    fix: () => 'Pass a pointer with `&value`. Example: `someFunc(&myVar)` instead of `someFunc(myVar)`.',
-  },
-  {
-    match: /attempt to use null value/,
-    title: 'Using a null optional',
-    explain: () => 'You tried to use an optional value (`?T`) without checking if it is `null` first.',
-    fix: () => 'Unwrap safely: `if (opt) |val| { use(val); }` or use `opt orelse defaultVal` or `opt orelse unreachable`.',
+    match: /unhandled exception: index out of bounds/,
+    title: 'Index out of bounds',
+    explain: () => `You accessed a sequence or array at an index that doesn't exist.`,
+    fix: () => `Check that your index is \`< len(seq)\` before accessing. Use \`if i < s.len: s[i]\`.`,
   },
   {
-    match: /index out of bounds/,
-    title: 'Array index out of bounds',
-    explain: () => 'You accessed an array or slice at an index that does not exist.',
-    fix: () => 'Check that your index is `< slice.len` before accessing. Use `if (i < arr.len) arr[i]` pattern.',
+    match: /unhandled exception: nil access/,
+    title: 'Nil pointer access',
+    explain: () => `You tried to access a field or method on a \`nil\` reference.`,
+    fix: () => `Check for nil before dereferencing: \`if myRef != nil: myRef.field\`.`,
+  },
+  // ── Async errors ──────────────────────────────────────────────────────────
+  {
+    match: /expression of type 'Future\[(.+?)\]' must be awaited/,
+    title: 'Forgot to await',
+    explain: m => `This async call returns a \`Future[${m[1]}]\` that you haven't awaited.`,
+    fix: () => `Add \`await\` before the call: \`let result = await myAsyncProc()\`.`,
+  },
+  // ── Pragma / attribute errors ─────────────────────────────────────────────
+  {
+    match: /unknown pragma: '(.+?)'/,
+    title: 'Unknown pragma',
+    explain: m => `The pragma \`{.${m[1]}.}\` is not recognized.`,
+    fix: () => `Check the Nim manual for valid pragmas. Common ones: \`{.raises: [].}\`, \`{.inline.}\`, \`{.exportc.}\`.`,
   },
   // ── Integer / arithmetic ──────────────────────────────────────────────────
   {
-    match: /integer overflow/,
+    match: /over- or underflow/,
     title: 'Integer overflow',
-    explain: () => 'An arithmetic operation produced a value too large for the integer type.',
-    fix: () => 'Use a wider integer type (e.g. `i64` instead of `i32`), or use wrapping operators (`+%`, `*%`) if overflow is intentional.',
+    explain: () => `An arithmetic operation produced a value outside the range of the integer type.`,
+    fix: () => `Use a wider type (\`int64\`) or use \`toInt()\` carefully. Wrap with \`uint\` for wrapping arithmetic.`,
   },
+  // ── Proc / call errors ────────────────────────────────────────────────────
   {
-    match: /no member named '(.+?)' in enum '(.+?)'/,
-    title: 'Unknown enum variant',
-    explain: (m) => `Enum \`${m[2]}\` does not have a variant named \`${m[1]}\`.`,
-    fix: (m) => `Check the enum definition for the correct variant names. Use \`@typeInfo(${m[2]})\` at comptime to inspect.`,
-  },
-  // ── Struct / field errors ─────────────────────────────────────────────────
-  {
-    match: /no field named '(.+?)' in struct '(.+?)'/,
-    title: 'Unknown struct field',
-    explain: (m) => `Struct \`${m[2]}\` has no field called \`${m[1]}\`.`,
-    fix: (m) => `Check the struct definition. Use \`@typeInfo(${m[2]}).@"struct".fields\` at comptime to see all fields.`,
-  },
-  {
-    match: /missing field '(.+?)'/,
-    title: 'Missing struct field in initialization',
-    explain: (m) => `You created a struct literal but did not provide a value for field \`${m[1]}\`.`,
-    fix: (m) => `Add \`.${m[1]} = value\` to the struct literal, or give the field a default value in the struct definition.`,
-  },
-  // ── Import / module errors ────────────────────────────────────────────────
-  {
-    match: /unable to find '(.+?)'/,
-    title: 'Import not found',
-    explain: (m) => `Zig could not find the file or package \`${m[1]}\`.`,
-    fix: (m) => `Check the path is correct relative to this file. For standard library: \`@import("std")\`. For local files: \`@import("./utils.zig")\`. For packages: add them to \`build.zig.zon\`.`,
-  },
-  // ── Function errors ───────────────────────────────────────────────────────
-  {
-    match: /too many arguments to function/,
-    title: 'Too many arguments',
-    explain: () => 'You called a function with more arguments than it accepts.',
-    fix: () => 'Check the function signature and remove the extra argument(s).',
-  },
-  {
-    match: /expected (\d+) argument\(s\), found (\d+)/,
+    match: /wrong number of arguments/,
     title: 'Wrong number of arguments',
-    explain: (m) => `Function expects ${m[1]} argument(s) but you passed ${m[2]}.`,
-    fix: (m) => `Add or remove arguments to match the expected ${m[1]}.`,
+    explain: () => `You called a proc with the wrong number of arguments.`,
+    fix: () => `Check the proc signature and provide the correct number of arguments.`,
+  },
+  {
+    match: /expression cannot be called/,
+    title: 'Not callable',
+    explain: () => `You tried to call something that isn't a proc or template.`,
+    fix: () => `Make sure you're calling a \`proc\`, \`func\`, \`template\`, or \`macro\`.`,
   },
   // ── Fallback ──────────────────────────────────────────────────────────────
-  {
-    match: /.*/,
-    title: null,
-    explain: () => null,
-    fix: () => null,
-  },
+  { match: /.*/, title: null, explain: () => null, fix: () => null },
 ]
 
-/**
- * Given a raw Zig error message, returns { title, explain, fix } or null.
- * title   — short label like "Type mismatch"
- * explain — one sentence what went wrong in human terms
- * fix     — concrete suggestion of how to fix it
- */
 export function explainError(message) {
-  for (const entry of ZIG_ERROR_EXPLANATIONS) {
+  for (const entry of NIM_ERROR_EXPLANATIONS) {
     const m = message.match(entry.match)
     if (m) {
-      const title   = entry.title
       const explain = entry.explain(m)
-      const fix     = entry.fix(m)
-      if (!explain) return null   // fallback entry matched, no explanation
-      return { title, explain, fix }
+      if (!explain) return null
+      return { title: entry.title, explain, fix: entry.fix(m) }
     }
   }
   return null
 }
 
-/**
- * Build the enhanced Problems panel item HTML.
- * Instead of a raw error dump, shows:
- *   [icon] human title (explain)
- *          Fix: suggestion
- *          file:line:col  [source badge]
- */
 export function buildEnhancedProblemItem(diag) {
   const explanation = explainError(diag.message)
-  const icon = diag.kind === 'error' ? '✕' : diag.kind === 'warning' ? '⚠' : 'ℹ'
+  const icon = diag.kind === 'error' ? 'x' : diag.kind === 'warning' ? '!' : 'ℹ'
   const kindClass = diag.kind
-
   const rawMsg = diag.message
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-
   const loc = `${diag.file.replace(/\\/g, '/').split('/').pop()}:${diag.line}:${diag.col}`
 
   if (!explanation) {
-    // No explanation — render normal but still nicer than a dump
     return `<div class="prob-item ${kindClass}" data-a="prob:goto"
         data-file="${diag.file}" data-line="${diag.line}" data-col="${diag.col}">
       <span class="prob-icon">${icon}</span>
@@ -725,18 +584,15 @@ export function buildEnhancedProblemItem(diag) {
     </div>`
   }
 
-  const explainHtml = explanation.explain
-    .replace(/`([^`]+)`/g, '<code class="prob-code">$1</code>')
-  const fixHtml = explanation.fix
-    .replace(/`([^`]+)`/g, '<code class="prob-code">$1</code>')
+  const esc = s => s.replace(/`([^`]+)`/g, '<code class="prob-code">$1</code>')
 
   return `<div class="prob-item ${kindClass} prob-enhanced" data-a="prob:goto"
       data-file="${diag.file}" data-line="${diag.line}" data-col="${diag.col}">
     <span class="prob-icon">${icon}</span>
     <div class="prob-body">
       <div class="prob-title">${explanation.title}</div>
-      <div class="prob-explain">${explainHtml}</div>
-      <div class="prob-fix"><span class="prob-fix-label">Fix →</span> ${fixHtml}</div>
+      <div class="prob-explain">${esc(explanation.explain)}</div>
+      <div class="prob-fix"><span class="prob-fix-label">Fix -></span> ${esc(explanation.fix)}</div>
       <div class="prob-raw">${rawMsg}</div>
       <span class="prob-loc">${loc}</span>
     </div>
