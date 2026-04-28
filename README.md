@@ -5,7 +5,7 @@
   ⬡  FERRUM STUDIO
 ```
 
-**The professional IDE built exclusively for Zig**
+**The professional IDE built exclusively for Nim**
 
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-blue?style=flat-square)](https://github.com/wailsapp/wails)
 [![Built with Wails](https://img.shields.io/badge/built%20with-Wails%20v2-orange?style=flat-square)](https://wails.io)
