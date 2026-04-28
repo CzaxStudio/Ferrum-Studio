@@ -1,5 +1,6 @@
 <div align="center">
 
+
 ```
   ⬡  FERRUM STUDIO
 ```
@@ -8,7 +9,7 @@
 
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-blue?style=flat-square)](https://github.com/wailsapp/wails)
 [![Built with Wails](https://img.shields.io/badge/built%20with-Wails%20v2-orange?style=flat-square)](https://wails.io)
-[![Language](https://img.shields.io/badge/language-Zig-orange?style=flat-square)](https://ziglang.org)
+[![Language](https://img.shields.io/badge/language-Nim-yellow?style=flat-square)](https://nim-lang.org)
 [![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)](LICENSE)
 
 *Fast. Native. Zero Electron.*
@@ -19,9 +20,9 @@
 
 ## Overview
 
-Ferrum Studio is a lightweight, native desktop IDE designed from the ground up for the [Zig programming language](https://ziglang.org). Built with Go + [Wails](https://wails.io), it runs as a true native application — not a bundled Chromium browser. The result is an IDE that starts in under a second, uses under 50 MB of RAM, and feels fast on any machine.
+Ferrum Studio is a lightweight, native desktop IDE designed from the ground up for the [Nim programming language]. Built with Go + [Wails](https://wails.io), it runs as a true native application — not a bundled Chromium browser. The result is an IDE that starts in under a second, uses under 50 MB of RAM, and feels fast on any machine.
 
-Most editors treat Zig as an afterthought — a language server plugin bolted onto a general-purpose tool. Ferrum Studio is different. Every feature, shortcut, snippet, error message, and template is designed around the way Zig developers actually work.
+Most editors treat Nim as an afterthought — a language server plugin bolted onto a general-purpose tool. Ferrum Studio is different. Every feature, shortcut, snippet, error message, and template is designed around the way Nim developers actually work.
 
 ---
 
@@ -42,150 +43,138 @@ Most editors treat Zig as an afterthought — a language server plugin bolted on
 
 
 
-> Open a Zig project → `F5` to run → see output instantly in the integrated terminal.
+> Open a Nim project → `F5` to run → see output instantly in the integrated terminal.
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│ File  Edit  Run  Zig  View            zig 0.14.0  windows   │
+│ File  Edit  Run  Nim  View            Nim 2.2.10  windows   │
 ├──────┬──────────────────────────────────────────────────────┤
-│  ◈   │  main.zig  ×                                         │
-│  ⚙   ├─ src / main.zig ──────────────────────────────────── │
-│  ≡   │  1  const std = @import("std");                      │
-│      │  2                                                    │
-│ src/ │  3  pub fn main() !void {                            │
-│  main│  4      const stdout = std.io.getStdOut().writer();  │
-│ build│  5      try stdout.print("Hello!\n", .{});           │
-│      │  6  }                                                 │
+│  ◈   │  main.Nim  ×                                         │
+│  ⚙   ├─ src / main.Nim ──────────────────────────────────── │
+│  ≡   │  1  echo "Hello"                                     │
+│      │  2                                                   │
+│ src/ │  3                                                   │
+│  main│  4                                                   │
+│ build│  5                                                   │
+│      │  6                                                   │
 │      ├──────────────────────────────────────────────────────│
-│      │ Terminal  ⚠ Problems  ✦ Tests  ⚙ Build               │
-│      │ $ zig run src/main.zig                               │
+│      │ Terminal  ⚠ Problems  ✦ Tests  ⚙ Build             │
+│      │                                                      │
 │      │ Hello!                                               │
-│      │ ─── ✓ exit 0 (0.31s) ───                            │
+│      │ ─── [OK] exit 0 (0.31s) ───                          │
 └──────┴──────────────────────────────────────────────────────┘
 ```
+
+---
+
 
 ---
 
 ## Features
 
 ### Editor
-| Feature | Detail |
-|---|---|
-| **Zig syntax highlighting** | Keywords, types, builtins, strings, numbers, bracket-pair colorization |
-| **Smart indentation** | Auto-indent on Enter; extra indent after `{`, `(`, `[` |
-| **Auto-close brackets** | `(`, `[`, `{` auto-close; skip-over on close key |
-| **Bracket match highlight** | Matching bracket pair highlighted as you type |
-| **IntelliSense** | 120+ completions — `std.*` modules, methods with signatures, `@builtins`, keywords, types |
-| **Dot-chain aware AC** | Typing `std.mem.` shows only `std.mem.*` entries |
-| **29 Zig snippets** | `fn`, `struct`, `enum`, `test`, `gpa`, `al`, `hm`, `defer`, `try`, `for`, `while`, and more |
-| **Inline error ghost text** | Compiler errors shown inline ← next to the offending line |
-| **Error squiggles** | Red/yellow wavy underlines directly on the error token |
-| **Line number click** | Click any line number to select that entire line |
-| **Smart Home key** | First press → first non-whitespace; second press → column 0 |
-| **Ctrl+D** | Select next occurrence of word under cursor |
-| **Ctrl+/** | Toggle line comment (`// `) |
-| **Ctrl+G** | Go to line number |
-| **Ctrl+F** | Find in file with regex and case-sensitive options |
-| **Ctrl+P** | Quick open — fuzzy search across all open tabs and project files |
-| **Word wrap** | `Ctrl+Shift+W` toggles soft wrap |
-| **Font size** | `Ctrl+=` larger, `Ctrl+-` smaller, `Ctrl+0` reset. Remembered across sessions |
-| **Multi-tab** | Open unlimited files; dirty indicator (orange dot); Ctrl+W to close |
-| **Save As** | Native save-as dialog; safe on Windows (no Wails crash) |
-| **Save before close** | Confirms before discarding unsaved changes |
 
-### Zig Integration
-| Feature | Detail |
-|---|---|
-| **Run** | `F5` — `zig run <file>` with live streaming output |
-| **Run with args** | `F6` — dialog to pass `-- arg1 arg2 ...` |
-| **Build** | `F7` — `zig build` with live output in Build panel |
-| **Test** | `F8` — `zig test` with pass/fail results in Tests panel |
-| **Format** | `Ctrl+Shift+F` — `zig fmt` in place |
-| **Check** | `Ctrl+Shift+C` — `zig ast-check` for instant diagnostics without building |
-| **Auto-check** | Diagnostics update 2.5 s after last keystroke (saves + checks silently) |
-| **Interactive stdin** | Programs that read from stdin work. Type in the terminal, press Enter to send input |
-| **Stop process** | `Ctrl+C` in terminal or ■ Stop button |
-| **Build steps panel** | Reads `build.zig` steps and shows one-click run buttons for each |
-
-### Problems Panel
-- Errors and warnings grouped by file
-- **Human-readable explanations** — "Type mismatch", "Writing to a constant", "Unused variable" instead of raw compiler dumps
-- **Fix suggestions** — concrete `Fix →` hint for 20+ common Zig error patterns
-- Click any error to jump directly to the line and column
-- Error count badges on tabs and file tree
-
-### Templates
-Five production-quality project starters under **File → New from Template**:
-
-| Template | What it creates |
-|---|---|
-| **Executable** | CLI app with argument parsing, GPA allocator, `build.zig`, `build.zig.zon`, README |
-| **Library** | Static lib with a `Buffer` struct, allocator, tests |
-| **TCP Server** | Multi-threaded HTTP echo server using `std.net` |
-| **Embedded / Bare-Metal** | Freestanding Zig for Cortex-M4, no OS, UART output, panic handler |
-| **Comptime Metaprogramming** | Generic `Stack(T)`, `@typeInfo` reflection, comptime array generation |
-
-All files are written into your open project folder and the main `.zig` file opens automatically.
-
-### Sidebar
-- **Explorer** — file tree with Git status marks (`M`, `A`, `?`), right-click context menu, rename, delete, new file/folder
-- **Build** — build steps from `build.zig`, one-click run each step
-- **Snippets** — browsable reference of all snippets and `std` modules
-
-### Terminal
-- Integrated terminal at the bottom
-- Full ANSI color support
-- Command history (Arrow Up/Down)
-- `run`, `build`, `test`, `fmt`, `check`, `zig <subcmd>` shortcuts
-- **Interactive input** — when a Zig program is running and waiting for stdin, the terminal prompt changes to `>` and keypresses are forwarded directly to the process
-- `Ctrl+C` kills the running process
-
-### New Project
-- **zig init** dialog — create a new project anywhere, auto-opens `src/main.zig`
-- Pre-fills dialog with current open folder path
-- Templates dialog for full starters
-
-### Git Integration
-- Branch name in status bar
-- Modified (`M`), added (`A`), untracked (`?`), deleted (`D`) markers on every file in the tree
-- Refreshes after every build
-
-### Zig Detection
-Ferrum Studio uses five strategies to find your Zig executable, in order:
-
-1. Standard `PATH` lookup
-2. **Windows registry** — reads `HKCU\Environment\Path` directly, so newly-installed Zig is found without restarting
-3. `AppData\Local\zig`, `AppData\Local\Programs\zig`, and all `zig*` subdirectories
-4. Common fixed paths (`C:\zig\zig.exe`, `/usr/local/bin/zig`, Homebrew, etc.)
-5. Scans home directory, `~/Downloads`, `~/dev`, `C:\` for `zig-*` folders
-
-If Zig still isn't found, a banner appears with:
-- **↻ Retry Detection** — re-runs all detection without restarting
-- **📂 Browse…** — file picker to locate `zig.exe` manually
-- **⚙ Click zig badge** — opens a settings dialog to type or browse the path
+- Nim syntax highlighting
+- Smart indentation (whitespace-aware)
+- Auto-close brackets
+- Bracket match highlighting
+- IntelliSense (modules, procs, templates, macros)
+- Dot-aware autocomplete
+- Snippets support
+- Inline error hints
+- Error squiggles
+- Multi-tab editing
+- Word wrap toggle
+- Quick open (Ctrl+P)
 
 ---
 
-## Installation
+### Nim Integration
+
+- `F5` → Run (`nim c -r`)
+- `F6` → Run with arguments
+- `F7` → Build
+- `F8` → Test
+- Format via `nim pretty`
+- Fast diagnostics via `nim check`
+- Auto-check after typing
+- Interactive stdin support
+- Stop process with Ctrl+C
+
+---
+
+### Problems Panel
+
+- Clean error explanations
+- Click to jump to line
+- Grouped by file
+- Suggestions for common mistakes
+
+---
+
+### Templates
+
+- CLI App
+- Library
+- Web App
+- Async App
+- Metaprogramming examples
+
+---
+
+### Sidebar
+
+- File explorer with Git indicators
+- Snippets browser
+- Build shortcuts
+
+---
+
+### Terminal
+
+- Integrated terminal
+- ANSI colors
+- Command history
+- Interactive input support
+
+---
+
+### Git Integration
+
+- Branch display
+- File status indicators
+- Auto refresh
+
+---
+
+### Nim Detection
+
+Ferrum Studio detects Nim automatically using:
+
+1. PATH lookup
+2. Common install directories
+3. Home directory scan
+4. Manual selection fallback
+
+---
+
+## Installation(For Go devs)
 
 ### Prerequisites
 
-| Tool | Version | Notes |
-|---|---|---|
-| [Zig](https://ziglang.org/download/) | 0.13.0 or newer | Add to PATH |
-| [Go](https://go.dev/dl/) | 1.21+ | Required to build |
-| [Wails CLI](https://wails.io/docs/gettingstarted/installation) | v2.x | `go install github.com/wailsapp/wails/v2/cmd/wails@latest` |
-| [Node.js](https://nodejs.org/) | 18+ | For frontend build |
+- Nim (1.6+ or 2.x)
+- Go (1.21+)
+- Wails CLI v2
+- Node.js 18+
 
-**Windows only:** [WebView2 Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/) (pre-installed on Windows 11; available free for Windows 10)
+---
 
-### Clone and run
+### Run
 
 ```bash
-git clone https://github.com/your-username/ferrum-studio
+git clone https://github.com/CzaxStudio/Ferrum-Studio
 cd ferrum-studio
 wails dev
-```
 
 ### Build for distribution
 
@@ -222,7 +211,7 @@ ferrum-studio/
 
 ### How it works
 
-Ferrum Studio uses Wails to embed a WebView2 (Windows) / WKWebView (macOS) / WebKitGTK (Linux) pane inside a native Go application. The Go backend handles all OS operations — running Zig, reading files, opening dialogs, registry access — and communicates with the JavaScript frontend via an auto-generated bridge.
+Ferrum Studio uses Wails to embed a WebView2 (Windows) / WKWebView (macOS) / WebKitGTK (Linux) pane inside a native Go application. The Go backend handles all OS operations — running Nim, reading files, opening dialogs, registry access — and communicates with the JavaScript frontend via an auto-generated bridge.
 
 There is no Electron, no Node.js runtime, no bundled Chromium. The total binary is ~8 MB on Windows.
 
@@ -257,8 +246,8 @@ There is no Electron, no Node.js runtime, no bundled Chromium. The total binary 
 |---|---|
 | `F5` | Run file |
 | `F6` | Run with arguments |
-| `F7` | zig build |
-| `F8` | zig test |
+| `F7` | nim build |
+| `F8` | nim test |
 | `Ctrl+C` (in terminal) | Kill running process |
 
 ### Navigation
@@ -271,40 +260,13 @@ There is no Electron, no Node.js runtime, no bundled Chromium. The total binary 
 
 ---
 
-## Snippets Reference
-
-Trigger a snippet by typing its shorthand and pressing `Tab`.
-
-| Trigger | Expands to |
-|---|---|
-| `fn` | `fn name(args) Type {}` |
-| `pfn` | `pub fn name(args) Type {}` |
-| `main` | `pub fn main() !void {}` |
-| `struct` | `const X = struct {}` |
-| `enum` | `const X = enum {}` |
-| `union` | `const X = union(enum) {}` |
-| `test` | `test "name" {}` |
-| `if` | `if (cond) {}` |
-| `ife` | `if (cond) {} else {}` |
-| `for` | `for (iter) \|it\| {}` |
-| `while` | `while (cond) {}` |
-| `sw` | `switch (val) { else => {} }` |
-| `defer` | `defer stmt;` |
-| `errd` | `errdefer stmt;` |
-| `gpa` | Full `GeneralPurposeAllocator` setup with `defer deinit()` |
-| `al` | `ArrayList(T)` with `init` and `defer deinit` |
-| `hm` | `StringHashMap(T)` with `init` and `defer deinit` |
-| `try` | `try expr` |
-| `std` | `const std = @import("std");` |
-| `print` | `std.debug.print("...\n", .{});` |
-
 ---
 
 ## Comparing Ferrum Studio
 
 | | Ferrum Studio | VS Code + ZLS | Zed |
 |---|---|---|---|
-| Purpose-built for Zig | ✓ | Partial | Partial |
+| Purpose-built for Nim | ✓ | Partial | Partial |
 | Native (no Electron) | ✓ | ✗ | ✓ |
 | Interactive stdin | ✓ | ✓ | ✓ |
 | Human-readable errors | ✓ | ✗ | ✗ |
@@ -327,13 +289,10 @@ Contributions are welcome. Areas where help is most valuable:
 - **macOS / Linux testing** — most development has been on Windows
 
 
-## AI Usage
+AI Usage
 
-Parts of the frontend (JavaScript/UI) were developed with the help of AI tools (Claude) due to my limited experience with JS.
-
-The Go backend, Zig integration, and overall architecture were implemented manually.
-
-This project is also a learning process, and the codebase will be refined and cleaned up over time.
+Frontend UI was partially assisted by AI tools.
+Core backend and architecture were implemented manually.
 
 
 ```bash
@@ -354,10 +313,16 @@ MIT License — see [LICENSE](LICENSE).
 
 <div align="center">
 
-Built with ♥ for the Zig community
+Built with ♥ for the Nim community
+
+</div> ```
 
 *"Ferrum" is Latin for iron — the element that gives steel its strength.*
 
-[ziglang.org](https://ziglang.org) · [wails.io](https://wails.io)
+## Thanks <3
+
+[claude](https://claude.ai/) · [wails.io](https://wails.io)
+
+[nim](nim-lang.org)            [Golang](https://go.dev/)
 
 </div>
