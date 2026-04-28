@@ -35,11 +35,16 @@ Most editors treat Nim as an afterthought — a language server plugin bolted on
 
 
 
+<img width="1366" height="709" alt="Capture" src="https://github.com/user-attachments/assets/621bf84f-a3b5-4f1c-a7d4-85e3b3e83247" />
 
-<img width="1366" height="722" alt="ForgeIDE" src="https://github.com/user-attachments/assets/3157fb47-22f2-4607-a688-6896b2e90156" />
+
+
+<img width="1362" height="724" alt="ferrum" src="https://github.com/user-attachments/assets/b0b4fb87-a644-4cdd-a0c0-63af98c7de97" />
+
 
 
 <img width="1365" height="723" alt="Capture11" src="https://github.com/user-attachments/assets/8689b35c-219e-429a-a96f-c38b8ad34ae4" />
+
 
 
 <img width="1366" height="725" alt="Capture15" src="https://github.com/user-attachments/assets/5ff1f01e-8177-412d-a0f7-f2b78072c846" />
