@@ -1,4 +1,5 @@
 package main
+
 import (
 	"bufio"
 	"context"
@@ -39,7 +40,7 @@ type Diag struct {
 type BuildStep struct {
 	Name string `json:"name"`
 	Desc string `json:"desc"`
-	Kind string `json:"kind"` // exe|lib|test|run|install|clean
+	Kind string `json:"kind"`
 }
 
 type GitStatus struct {
@@ -54,9 +55,10 @@ type GitStatus struct {
 type App struct {
 	ctx         context.Context
 	projectRoot string
-	zigPath     string
+	nimPath     string // path to nim executable
+	nimblePath  string // path to nimble executable
 	proc        *os.Process
-	procStdin   io.WriteCloser // stdin pipe for the running process
+	procStdin   io.WriteCloser
 	procMu      sync.Mutex
 }
 
@@ -67,21 +69,21 @@ func (a *App) startup(ctx context.Context) {
 	if home, err := os.UserHomeDir(); err == nil {
 		a.projectRoot = home
 	}
-	a.zigPath = locateZig()
+	a.nimPath = locateNim()
+	a.nimblePath = locateNimble()
 }
 
+// ── Nim discovery ─────────────────────────────────────────────────────────────
 
-
-func locateZig() string {
-	
-	if p, err := exec.LookPath("zig"); err == nil {
+func locateNim() string {
+	// Strategy 1: standard PATH
+	if p, err := exec.LookPath("nim"); err == nil {
 		return p
 	}
-
-
+	// Strategy 2: fresh PATH from OS
 	if freshPath := getFreshPATH(); freshPath != "" {
 		for _, dir := range filepath.SplitList(freshPath) {
-			for _, name := range []string{"zig", "zig.exe"} {
+			for _, name := range []string{"nim", "nim.exe"} {
 				p := filepath.Join(dir, name)
 				if _, err := os.Stat(p); err == nil {
 					return p
@@ -89,45 +91,39 @@ func locateZig() string {
 			}
 		}
 	}
-
 	home, _ := os.UserHomeDir()
-
-	
 	candidates := []string{
 		// Unix
-		"/usr/local/bin/zig",
-		"/usr/bin/zig",
-		"/opt/homebrew/bin/zig",
-		"/home/linuxbrew/.linuxbrew/bin/zig",
-		filepath.Join(home, ".local", "bin", "zig"),
-		filepath.Join(home, "bin", "zig"),
-		filepath.Join(home, ".zig", "zig"),
-
-		
-		`C:\zig\zig.exe`,
-		`C:\zig-windows-x86_64\zig.exe`,
-		`C:\Program Files\zig\zig.exe`,
-		`C:\Program Files (x86)\zig\zig.exe`,
-		`C:\tools\zig\zig.exe`,
-		filepath.Join(home, "zig", "zig.exe"),
-		filepath.Join(home, ".zig", "zig.exe"),
+		"/usr/local/bin/nim",
+		"/usr/bin/nim",
+		"/opt/homebrew/bin/nim",
+		"/home/linuxbrew/.linuxbrew/bin/nim",
+		filepath.Join(home, ".local", "bin", "nim"),
+		filepath.Join(home, "bin", "nim"),
+		filepath.Join(home, ".nimble", "bin", "nim"),
+		filepath.Join(home, "nim", "bin", "nim"),
+		// Windows
+		`C:\nim\bin\nim.exe`,
+		`C:\Program Files\nim\bin\nim.exe`,
+		filepath.Join(home, "nim", "bin", "nim.exe"),
+		filepath.Join(home, ".nimble", "bin", "nim.exe"),
 	}
-
+	// choosenim puts nim in ~/.nimble/bin
 	if localAppData := os.Getenv("LOCALAPPDATA"); localAppData != "" {
 		candidates = append(candidates,
-			filepath.Join(localAppData, "zig", "zig.exe"),
-			filepath.Join(localAppData, "Programs", "zig", "zig.exe"),
+			filepath.Join(localAppData, "nim", "bin", "nim.exe"),
+			filepath.Join(localAppData, "choosenim", "toolchains", "nim-stable", "bin", "nim.exe"),
 		)
-		
 		if entries, err := os.ReadDir(localAppData); err == nil {
 			for _, e := range entries {
-				if e.IsDir() && strings.HasPrefix(strings.ToLower(e.Name()), "zig") {
+				if e.IsDir() && strings.HasPrefix(strings.ToLower(e.Name()), "nim") {
 					candidates = append(candidates,
-						filepath.Join(localAppData, e.Name(), "zig.exe"))
+						filepath.Join(localAppData, e.Name(), "bin", "nim.exe"))
 				}
 			}
 		}
 	}
+	// Scan common dirs for nim-* folders
 	for _, searchDir := range []string{home, filepath.Join(home, "Downloads"), filepath.Join(home, "dev"), `C:\`} {
 		if entries, err := os.ReadDir(searchDir); err == nil {
 			for _, e := range entries {
@@ -135,49 +131,57 @@ func locateZig() string {
 					continue
 				}
 				lower := strings.ToLower(e.Name())
-				if strings.HasPrefix(lower, "zig") {
+				if strings.HasPrefix(lower, "nim") {
 					candidates = append(candidates,
-						filepath.Join(searchDir, e.Name(), "zig"),
-						filepath.Join(searchDir, e.Name(), "zig.exe"))
+						filepath.Join(searchDir, e.Name(), "bin", "nim"),
+						filepath.Join(searchDir, e.Name(), "bin", "nim.exe"))
 				}
 			}
 		}
 	}
-
 	for _, p := range candidates {
 		if _, err := os.Stat(p); err == nil {
 			return p
 		}
 	}
-
-	
-	return "zig"
+	return "nim"
 }
 
+func locateNimble() string {
+	if p, err := exec.LookPath("nimble"); err == nil {
+		return p
+	}
+	home, _ := os.UserHomeDir()
+	candidates := []string{
+		filepath.Join(home, ".nimble", "bin", "nimble"),
+		filepath.Join(home, ".nimble", "bin", "nimble.exe"),
+		"/usr/local/bin/nimble",
+		"/usr/bin/nimble",
+		`C:\nim\bin\nimble.exe`,
+	}
+	for _, p := range candidates {
+		if _, err := os.Stat(p); err == nil {
+			return p
+		}
+	}
+	return "nimble"
+}
 
 func getFreshPATH() string {
 	switch goruntime.GOOS {
 	case "windows":
-		
 		return getWindowsUserPATH()
-	case "linux":
-		
-		return getUnixShellPATH()
-	case "darwin":
+	case "linux", "darwin":
 		return getUnixShellPATH()
 	}
 	return ""
 }
 
 func getWindowsUserPATH() string {
-	
-	cmd := exec.Command("reg", "query",
-		`HKCU\Environment`,
-		"/v", "Path")
+	cmd := exec.Command("reg", "query", `HKCU\Environment`, "/v", "Path")
 	cmd.SysProcAttr = hiddenWindow()
 	out, err := cmd.Output()
 	if err != nil {
-		
 		cmd2 := exec.Command("reg", "query",
 			`HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Environment`,
 			"/v", "Path")
@@ -188,17 +192,12 @@ func getWindowsUserPATH() string {
 		}
 		out = out2
 	}
-	
-	lines := strings.Split(string(out), "\n")
-	for _, line := range lines {
+	for _, line := range strings.Split(string(out), "\n") {
 		line = strings.TrimSpace(line)
 		if strings.HasPrefix(strings.ToUpper(line), "PATH") {
-			
 			parts := strings.Fields(line)
 			if len(parts) >= 3 {
-				
-				rawPath := strings.Join(parts[2:], " ")
-				return os.ExpandEnv(rawPath)
+				return os.ExpandEnv(strings.Join(parts[2:], " "))
 			}
 		}
 	}
@@ -206,7 +205,6 @@ func getWindowsUserPATH() string {
 }
 
 func getUnixShellPATH() string {
-	
 	shell := os.Getenv("SHELL")
 	if shell == "" {
 		shell = "/bin/sh"
@@ -222,25 +220,21 @@ func getUnixShellPATH() string {
 func augmentedEnv() []string {
 	env := os.Environ()
 	home, _ := os.UserHomeDir()
-
-	
 	extraDirs := []string{
 		"/usr/local/bin", "/opt/homebrew/bin",
 		"/home/linuxbrew/.linuxbrew/bin",
 		"/usr/bin", "/bin",
 		filepath.Join(home, ".local", "bin"),
 		filepath.Join(home, "bin"),
+		filepath.Join(home, ".nimble", "bin"),
+		filepath.Join(home, "nim", "bin"),
 	}
-
-	
 	if fresh := getFreshPATH(); fresh != "" {
 		for _, dir := range filepath.SplitList(fresh) {
 			extraDirs = append(extraDirs, dir)
 		}
 	}
-
 	extra := strings.Join(extraDirs, string(os.PathListSeparator))
-
 	for i, kv := range env {
 		if strings.HasPrefix(kv, "PATH=") || strings.HasPrefix(kv, "Path=") {
 			env[i] = kv + string(os.PathListSeparator) + extra
@@ -261,93 +255,81 @@ func (a *App) OpenFolder() string {
 	return p
 }
 
-func (a *App) OpenFile() map[string]string {
+func (a *App) OpenFile() string {
 	p, err := wails.OpenFileDialog(a.ctx, wails.OpenDialogOptions{
 		Title: "Open File",
 		Filters: []wails.FileFilter{
-			{DisplayName: "Zig Files", Pattern: "*.zig"},
-			{DisplayName: "All Files", Pattern: "*"},
+			{DisplayName: "Nim files", Pattern: "*.nim;*.nims;*.nimble"},
+			{DisplayName: "All files", Pattern: "*"},
 		},
 	})
 	if err != nil || p == "" {
-		return nil
+		return ""
 	}
-	b, err := os.ReadFile(p)
-	if err != nil {
-		return nil
-	}
-	return map[string]string{"path": p, "content": string(b)}
+	return p
 }
 
-func (a *App) ReadFile(path string) string {
-	b, err := os.ReadFile(path)
+func (a *App) ReadFile(p string) string {
+	b, err := os.ReadFile(p)
 	if err != nil {
 		return ""
 	}
 	return string(b)
 }
 
-func (a *App) WriteFile(path, content string) string {
-	_ = os.MkdirAll(filepath.Dir(path), 0755)
-	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+func (a *App) WriteFile(p, content string) string {
+	if err := os.WriteFile(p, []byte(content), 0644); err != nil {
 		return err.Error()
 	}
 	return ""
 }
-
-
-func (a *App) SaveFileDialog(name string) string {
-	
-	return ""
-}
-
 
 func (a *App) SaveAs(path, content string) string {
-	if path == "" {
-		return "empty path"
-	}
-	_ = os.MkdirAll(filepath.Dir(path), 0755)
 	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		return "error: " + err.Error()
+	}
+	return ""
+}
+
+func (a *App) SaveFileDialog(name string) string { return "" }
+
+func (a *App) CreateFile(p string) string {
+	if err := os.WriteFile(p, []byte(""), 0644); err != nil {
 		return err.Error()
 	}
 	return ""
 }
 
-func (a *App) GetFileTree(root string) FileNode {
+func (a *App) CreateDir(p string) string {
+	if err := os.MkdirAll(p, 0755); err != nil {
+		return err.Error()
+	}
+	return ""
+}
+
+func (a *App) DeletePath(p string) string {
+	if err := os.RemoveAll(p); err != nil {
+		return err.Error()
+	}
+	return ""
+}
+
+func (a *App) RenamePath(old, newp string) string {
+	if err := os.Rename(old, newp); err != nil {
+		return err.Error()
+	}
+	return ""
+}
+
+func (a *App) GetFileTree(root string) (*FileNode, error) {
 	if root == "" {
 		root = a.projectRoot
 	}
-	node, _ := buildTree(root, 0)
-	return node
-}
-
-func (a *App) CreateFile(path string) string {
-	_ = os.MkdirAll(filepath.Dir(path), 0755)
-	if err := os.WriteFile(path, []byte(""), 0644); err != nil {
-		return err.Error()
+	node, err := buildTree(root, 0)
+	if err != nil {
+		return nil, err
 	}
-	return ""
-}
-
-func (a *App) CreateDir(path string) string {
-	if err := os.MkdirAll(path, 0755); err != nil {
-		return err.Error()
-	}
-	return ""
-}
-
-func (a *App) DeletePath(path string) string {
-	if err := os.RemoveAll(path); err != nil {
-		return err.Error()
-	}
-	return ""
-}
-
-func (a *App) RenamePath(oldPath, newPath string) string {
-	if err := os.Rename(oldPath, newPath); err != nil {
-		return err.Error()
-	}
-	return ""
+	return &node, nil
 }
 
 func buildTree(path string, depth int) (FileNode, error) {
@@ -355,8 +337,12 @@ func buildTree(path string, depth int) (FileNode, error) {
 	if err != nil {
 		return FileNode{}, err
 	}
-	e := strings.TrimPrefix(filepath.Ext(info.Name()), ".")
-	node := FileNode{Name: info.Name(), Path: path, IsDir: info.IsDir(), Ext: e}
+	node := FileNode{
+		Name:  info.Name(),
+		Path:  path,
+		IsDir: info.IsDir(),
+		Ext:   strings.TrimPrefix(filepath.Ext(info.Name()), "."),
+	}
 	if !info.IsDir() || depth > 6 {
 		return node, nil
 	}
@@ -382,40 +368,32 @@ func buildTree(path string, depth int) (FileNode, error) {
 	return node, nil
 }
 
-
+// ── Git ───────────────────────────────────────────────────────────────────────
 
 func (a *App) GetGitStatus() GitStatus {
 	gs := GitStatus{}
-
-	
-	_, err := os.Stat(filepath.Join(a.projectRoot, ".git"))
-	if err != nil {
+	if _, err := os.Stat(filepath.Join(a.projectRoot, ".git")); err != nil {
 		return gs
 	}
 	gs.HasGit = true
-
-	
 	cmd := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD")
+	cmd.SysProcAttr = hiddenWindow()
 	cmd.Dir = a.projectRoot
 	if out, err := cmd.Output(); err == nil {
 		gs.Branch = strings.TrimSpace(string(out))
 	}
-
-	
 	cmd = exec.Command("git", "status", "--porcelain")
+	cmd.SysProcAttr = hiddenWindow()
 	cmd.Dir = a.projectRoot
 	out, err := cmd.Output()
 	if err != nil {
 		return gs
 	}
-
 	for _, line := range strings.Split(string(out), "\n") {
 		if len(line) < 3 {
 			continue
 		}
-		x := line[0]
-		y := line[1]
-		file := strings.TrimSpace(line[3:])
+		x, y, file := line[0], line[1], strings.TrimSpace(line[3:])
 		switch {
 		case x == 'M' || y == 'M':
 			gs.Modified = append(gs.Modified, file)
@@ -443,31 +421,51 @@ func parseDiags(output, source string) []Diag {
 	return out
 }
 
+// parseDiagLine parses a single line of Nim compiler output.
+// Nim format: /path/to/file.nim(10, 5) Error: undeclared identifier: 'x'
+// Also handles Windows paths: C:\path\to\file.nim(10, 5) Error: ...
 func parseDiagLine(line, source string) (Diag, bool) {
-	line = stripAnsi(line)
+	line = stripAnsi(strings.TrimSpace(line))
 	if line == "" {
 		return Diag{}, false
 	}
-	prefix := ""
-	rest := line
-	if len(line) >= 3 && isLetter(line[0]) && line[1] == ':' && (line[2] == '\\' || line[2] == '/') {
-		prefix = line[:2]
-		rest = line[2:]
-	}
-	parts := strings.SplitN(rest, ":", 4)
-	if len(parts) < 4 {
+
+	// Find the (line, col) marker — everything before it is the file path
+	parenOpen := strings.LastIndex(line, "(")
+	parenClose := strings.Index(line[parenOpen+1:], ")")
+	if parenOpen < 0 || parenClose < 0 {
 		return Diag{}, false
 	}
-	lineNum, err1 := strconv.Atoi(strings.TrimSpace(parts[1]))
-	colNum, err2 := strconv.Atoi(strings.TrimSpace(parts[2]))
+	parenClose += parenOpen + 1
+
+	filePath := strings.TrimSpace(line[:parenOpen])
+	if filePath == "" {
+		return Diag{}, false
+	}
+
+	// Parse "line, col" inside parens
+	coords := line[parenOpen+1 : parenClose]
+	coordParts := strings.SplitN(coords, ",", 2)
+	if len(coordParts) != 2 {
+		return Diag{}, false
+	}
+	lineNum, err1 := strconv.Atoi(strings.TrimSpace(coordParts[0]))
+	colNum, err2 := strconv.Atoi(strings.TrimSpace(coordParts[1]))
 	if err1 != nil || err2 != nil || lineNum <= 0 {
 		return Diag{}, false
 	}
-	tail := strings.TrimSpace(parts[3])
+
+	// Rest after ) is " Error: msg" or " Warning: msg" etc
+	tail := strings.TrimSpace(line[parenClose+1:])
 	var kind, msg string
-	for _, k := range []string{"error", "warning", "note"} {
+	for _, k := range []string{"Error", "Warning", "Hint", "error", "warning", "hint"} {
 		if strings.HasPrefix(tail, k+":") {
-			kind = k
+			lower := strings.ToLower(k)
+			if lower == "hint" {
+				kind = "note"
+			} else {
+				kind = lower
+			}
 			msg = strings.TrimSpace(tail[len(k)+1:])
 			break
 		}
@@ -475,9 +473,14 @@ func parseDiagLine(line, source string) (Diag, bool) {
 	if kind == "" {
 		return Diag{}, false
 	}
+
 	return Diag{
-		File: prefix + parts[0], Line: lineNum, Col: colNum,
-		Kind: kind, Message: msg, Source: source,
+		File:    filePath,
+		Line:    lineNum,
+		Col:     colNum,
+		Kind:    kind,
+		Message: msg,
+		Source:  source,
 	}, true
 }
 
@@ -499,18 +502,23 @@ func stripAnsi(s string) string {
 	return b.String()
 }
 
-func isLetter(c byte) bool {
-	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
-}
+func isLetter(c byte) bool { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') }
 
-// ── ZigCheck ─────────────────────────────────────────────────────────────────
+// ── NimCheck — nim check <file> ───────────────────────────────────────────────
 
-func (a *App) ZigCheck(path string) []Diag {
-	cmd := exec.Command(a.zigPath, "ast-check", path)
+func (a *App) NimCheck(path string) []Diag {
+	// Use nim check with --errorMax:0 (show all errors) and --hints:off (reduce noise)
+	// --listFullPaths ensures absolute paths in output for correct file association
+	cmd := exec.Command(a.nimPath, "check",
+		"--hints:off",
+		"--errorMax:0",
+		"--listFullPaths",
+		path)
+	cmd.SysProcAttr = hiddenWindow()
 	cmd.Env = augmentedEnv()
 	cmd.Dir = a.projectRoot
 	out, _ := cmd.CombinedOutput()
-	diags := parseDiags(string(out), "ast-check")
+	diags := parseDiags(string(out), "nim check")
 	for i, d := range diags {
 		if !filepath.IsAbs(d.File) {
 			diags[i].File = filepath.Join(a.projectRoot, d.File)
@@ -519,35 +527,42 @@ func (a *App) ZigCheck(path string) []Diag {
 	return diags
 }
 
-// ── RunZig (streaming) ────────────────────────────────────────────────────────
+// ── RunNim (streaming) ────────────────────────────────────────────────────────
 
-func (a *App) RunZig(cmdline string) {
+func (a *App) RunNim(cmdline string) {
 	a.KillProc()
 	go func() {
 		parts := tokenise(cmdline)
 		if len(parts) == 0 {
-			wails.EventsEmit(a.ctx, "zig:out", "\x1b[31merror: empty command\x1b[0m\n")
-			wails.EventsEmit(a.ctx, "zig:done", 1)
+			wails.EventsEmit(a.ctx, "nim:out", "\x1b[31merror: empty command\x1b[0m\n")
+			wails.EventsEmit(a.ctx, "nim:done", 1)
 			return
 		}
 		source := parts[0]
 		ctx, cancel := context.WithTimeout(a.ctx, 5*60*time.Second)
 		defer cancel()
 
-		cmd := exec.CommandContext(ctx, a.zigPath, parts...)
+		// Resolve nim/nimble/nimr for the command
+		exe := a.nimPath
+		if parts[0] == "nimble" {
+			exe = a.nimblePath
+			parts = parts[1:]
+		}
+
+		cmd := exec.CommandContext(ctx, exe, parts...)
+		cmd.SysProcAttr = hiddenWindow()
 		cmd.Env = augmentedEnv()
 		cmd.Dir = a.projectRoot
 
-		
 		stdinPipe, stdinErr := cmd.StdinPipe()
 		stdout, _ := cmd.StdoutPipe()
 		stderr, _ := cmd.StderrPipe()
 
 		if err := cmd.Start(); err != nil {
-			wails.EventsEmit(a.ctx, "zig:out",
-				fmt.Sprintf("\x1b[31m[ferrum] cannot start zig\nerror: %v\nzig path: %s\x1b[0m\n", err, a.zigPath))
-			wails.EventsEmit(a.ctx, "zig:done", 1)
-			wails.EventsEmit(a.ctx, "zig:diags", []Diag{})
+			wails.EventsEmit(a.ctx, "nim:out",
+				fmt.Sprintf("\x1b[31m[ferrum] cannot start nim\nerror: %v\nnim path: %s\x1b[0m\n", err, a.nimPath))
+			wails.EventsEmit(a.ctx, "nim:done", 1)
+			wails.EventsEmit(a.ctx, "nim:diags", []Diag{})
 			return
 		}
 
@@ -571,7 +586,7 @@ func (a *App) RunZig(cmdline string) {
 			for {
 				n, err := stdout.Read(buf)
 				if n > 0 {
-					wails.EventsEmit(a.ctx, "zig:out", string(buf[:n]))
+					wails.EventsEmit(a.ctx, "nim:out", string(buf[:n]))
 				}
 				if err != nil {
 					return
@@ -585,7 +600,7 @@ func (a *App) RunZig(cmdline string) {
 			sc.Buffer(make([]byte, 1024*1024), 1024*1024)
 			for sc.Scan() {
 				line := sc.Text()
-				wails.EventsEmit(a.ctx, "zig:out", line+"\n")
+				wails.EventsEmit(a.ctx, "nim:out", line+"\n")
 				mu.Lock()
 				stderrLines = append(stderrLines, line)
 				mu.Unlock()
@@ -617,11 +632,10 @@ func (a *App) RunZig(cmdline string) {
 				diags[i].File = filepath.Join(a.projectRoot, d.File)
 			}
 		}
-		wails.EventsEmit(a.ctx, "zig:diags", diags)
-		wails.EventsEmit(a.ctx, "zig:done", code)
+		wails.EventsEmit(a.ctx, "nim:diags", diags)
+		wails.EventsEmit(a.ctx, "nim:done", code)
 	}()
 }
-
 
 func (a *App) SendInput(text string) {
 	a.procMu.Lock()
@@ -630,67 +644,92 @@ func (a *App) SendInput(text string) {
 	if pipe == nil {
 		return
 	}
-	
 	_, _ = fmt.Fprintln(pipe, text)
 }
 
 func (a *App) KillProc() {
 	a.procMu.Lock()
 	p := a.proc
+	stdin := a.procStdin
+	a.procStdin = nil
 	a.proc = nil
 	a.procMu.Unlock()
+	if stdin != nil {
+		stdin.Close()
+	}
 	if p != nil {
 		p.Kill()
 	}
 }
 
-func (a *App) ZigFmt(path string) string {
-	cmd := exec.Command(a.zigPath, "fmt", path)
+// ── NimFmt — nimpretty <file> ─────────────────────────────────────────────────
+
+func (a *App) NimFmt(path string) string {
+	// nimpretty formats in place — try nimpretty first, fall back to nim --nep1
+	nimpretty, err := exec.LookPath("nimpretty")
+	if err != nil {
+		// Try beside the nim binary
+		nimpretty = filepath.Join(filepath.Dir(a.nimPath), "nimpretty")
+		if _, statErr := os.Stat(nimpretty); statErr != nil {
+			nimpretty = filepath.Join(filepath.Dir(a.nimPath), "nimpretty.exe")
+		}
+	}
+	cmd := exec.Command(nimpretty, path)
+	cmd.SysProcAttr = hiddenWindow()
 	cmd.Env = augmentedEnv()
 	cmd.Dir = a.projectRoot
-	cmd.CombinedOutput()
-	b, err := os.ReadFile(path)
-	if err != nil {
+	if out, fmtErr := cmd.CombinedOutput(); fmtErr != nil {
+		return "error: " + string(out)
+	}
+	b, readErr := os.ReadFile(path)
+	if readErr != nil {
 		return ""
 	}
 	return string(b)
 }
 
-
+// ── Build steps (nimble tasks) ────────────────────────────────────────────────
 
 func (a *App) GetBuildSteps() []BuildStep {
-	cmd := exec.Command(a.zigPath, "build", "--help")
+	// Check if nimble project exists
+	if _, err := os.Stat(filepath.Join(a.projectRoot, "*.nimble")); err != nil {
+		// Fallback: glob for .nimble file
+		entries, _ := os.ReadDir(a.projectRoot)
+		hasNimble := false
+		for _, e := range entries {
+			if strings.HasSuffix(e.Name(), ".nimble") {
+				hasNimble = true
+				break
+			}
+		}
+		if !hasNimble {
+			return defaultBuildSteps()
+		}
+	}
+	cmd := exec.Command(a.nimblePath, "tasks")
+	cmd.SysProcAttr = hiddenWindow()
 	cmd.Env = augmentedEnv()
 	cmd.Dir = a.projectRoot
 	out, err := cmd.Output()
 	if err != nil {
 		return defaultBuildSteps()
 	}
-
 	var steps []BuildStep
-	inSteps := false
 	for _, line := range strings.Split(string(out), "\n") {
-		if strings.TrimSpace(line) == "Steps:" {
-			inSteps = true
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "Nim") {
 			continue
 		}
-		if inSteps {
-			if line == "" || (len(line) > 0 && line[0] != ' ') {
-				break
-			}
-			trimmed := strings.TrimSpace(line)
-			if trimmed == "" {
-				continue
-			}
-			parts := strings.SplitN(trimmed, " ", 2)
-			name := strings.TrimRight(parts[0], ":")
-			desc := ""
-			if len(parts) > 1 {
-				desc = strings.TrimSpace(parts[1])
-			}
-			kind := kindForStep(name)
-			steps = append(steps, BuildStep{Name: name, Desc: desc, Kind: kind})
+		parts := strings.SplitN(line, " ", 2)
+		name := strings.TrimRight(parts[0], ":")
+		if name == "" {
+			continue
 		}
+		desc := ""
+		if len(parts) > 1 {
+			desc = strings.TrimSpace(parts[1])
+		}
+		steps = append(steps, BuildStep{Name: name, Desc: desc, Kind: kindForStep(name)})
 	}
 	if len(steps) == 0 {
 		return defaultBuildSteps()
@@ -715,47 +754,83 @@ func kindForStep(name string) string {
 
 func defaultBuildSteps() []BuildStep {
 	return []BuildStep{
-		{Name: "install", Desc: "Build and install", Kind: "install"},
-		{Name: "run", Desc: "Run the application", Kind: "run"},
-		{Name: "test", Desc: "Run all tests", Kind: "test"},
-		{Name: "uninstall", Desc: "Remove installed files", Kind: "clean"},
+		{Name: "build", Desc: "nim c -d:release src/main.nim", Kind: "install"},
+		{Name: "run", Desc: "nim r src/main.nim", Kind: "run"},
+		{Name: "test", Desc: "nimble test", Kind: "test"},
+		{Name: "install", Desc: "nimble install", Kind: "install"},
 	}
 }
 
-// ── Scaffold project ──────────────────────────────────────────────────────────
+// ── Scaffold project (nimble init) ────────────────────────────────────────────
 
 func (a *App) ScaffoldProject(dir, kind string) string {
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return "error: " + err.Error()
 	}
 	a.projectRoot = dir
-	cmd := exec.Command(a.zigPath, "init")
-	cmd.Env = augmentedEnv()
-	cmd.Dir = dir
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		return "error: " + err.Error() + "\n" + string(out)
+	// nimble init is interactive — create minimal structure manually instead
+	srcDir := filepath.Join(dir, "src")
+	if err := os.MkdirAll(srcDir, 0755); err != nil {
+		return "error creating src: " + err.Error()
 	}
-	return string(out)
+	projName := filepath.Base(dir)
+	mainContent := fmt.Sprintf(`# %s
+# Entry point
+
+echo "Hello from Nim!"
+`, projName)
+	mainPath := filepath.Join(srcDir, projName+".nim")
+	if err := os.WriteFile(mainPath, []byte(mainContent), 0644); err != nil {
+		return "error: " + err.Error()
+	}
+	nimbleContent := fmt.Sprintf(`# Package
+version = "0.1.0"
+author = "Your Name"
+description = "A new Nim project"
+license = "MIT"
+srcDir = "src"
+bin = @["%s"]
+
+# Dependencies
+requires "nim >= 2.0.0"
+`, projName)
+	nimblePath := filepath.Join(dir, projName+".nimble")
+	if err := os.WriteFile(nimblePath, []byte(nimbleContent), 0644); err != nil {
+		return "error: " + err.Error()
+	}
+	return fmt.Sprintf("Created %s.nim and %s.nimble\n", projName, projName)
 }
 
-// ── Zig info ──────────────────────────────────────────────────────────────────
+// ── Nim info ──────────────────────────────────────────────────────────────────
 
-func (a *App) ZigVersion() string {
-	cmd := exec.Command(a.zigPath, "version")
+func (a *App) NimVersion() string {
+	cmd := exec.Command(a.nimPath, "--version")
+	cmd.SysProcAttr = hiddenWindow()
 	cmd.Env = augmentedEnv()
 	out, err := cmd.Output()
 	if err != nil {
 		return "not found"
 	}
-	return strings.TrimSpace(string(out))
+	// First line: "Nim Compiler Version X.Y.Z ..."
+	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
+	if len(lines) > 0 {
+		line := lines[0]
+		if i := strings.Index(line, "Version"); i >= 0 {
+			parts := strings.Fields(line[i:])
+			if len(parts) >= 2 {
+				return parts[1]
+			}
+		}
+		return strings.TrimSpace(line)
+	}
+	return "not found"
 }
 
-func (a *App) GetZigInfo() map[string]string {
-	ver := a.ZigVersion()
+func (a *App) GetNimInfo() map[string]string {
+	ver := a.NimVersion()
 	return map[string]string{
 		"version": ver,
-		"path":    a.zigPath,
+		"path":    a.nimPath,
 		"os":      goruntime.GOOS,
 		"arch":    goruntime.GOARCH,
 	}
@@ -763,46 +838,48 @@ func (a *App) GetZigInfo() map[string]string {
 
 func (a *App) GetPlatform() string    { return goruntime.GOOS + "/" + goruntime.GOARCH }
 func (a *App) GetProjectRoot() string { return a.projectRoot }
-func (a *App) GetZigPath() string     { return a.zigPath }
+func (a *App) GetNimPath() string     { return a.nimPath }
 
-
-func (a *App) SetZigPath(p string) string {
+func (a *App) SetNimPath(p string) string {
 	if p == "" {
 		return "empty path"
 	}
-	
-	cmd := exec.Command(p, "version")
+	cmd := exec.Command(p, "--version")
+	cmd.SysProcAttr = hiddenWindow()
 	cmd.Env = augmentedEnv()
 	out, err := cmd.Output()
 	if err != nil {
 		return "not executable: " + err.Error()
 	}
-	a.zigPath = p
-	return strings.TrimSpace(string(out))
+	a.nimPath = p
+	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
+	if len(lines) > 0 {
+		return strings.TrimSpace(lines[0])
+	}
+	return "ok"
 }
 
-
-func (a *App) BrowseForZig() string {
+func (a *App) BrowseForNim() string {
 	p, err := wails.OpenFileDialog(a.ctx, wails.OpenDialogOptions{
-		Title: "Find your Zig executable",
+		Title: "Find your Nim executable",
 		Filters: []wails.FileFilter{
-			{DisplayName: "zig / zig.exe", Pattern: "zig;zig.exe"},
+			{DisplayName: "nim / nim.exe", Pattern: "nim;nim.exe"},
 			{DisplayName: "All files", Pattern: "*"},
 		},
 	})
 	if err != nil || p == "" {
 		return ""
 	}
-	return a.SetZigPath(p)
+	return a.SetNimPath(p)
 }
 
-
-func (a *App) RetryZigDetection() map[string]string {
-	a.zigPath = locateZig()
-	return a.GetZigInfo()
+func (a *App) RetryNimDetection() map[string]string {
+	a.nimPath = locateNim()
+	a.nimblePath = locateNimble()
+	return a.GetNimInfo()
 }
 
-// ── tokenise ─────────────────────────────────────────────────────────────────
+// ── tokenise ──────────────────────────────────────────────────────────────────
 
 func tokenise(s string) []string {
 	var out []string
