@@ -575,7 +575,7 @@ func (a *App) RunNim(cmdline string) {
 		}
 		a.procMu.Unlock()
 
-		var stderrLines []string
+		var stderrOutput strings.Builder
 		var mu sync.Mutex
 		var wg sync.WaitGroup
 		wg.Add(2)
@@ -596,14 +596,19 @@ func (a *App) RunNim(cmdline string) {
 
 		go func() {
 			defer wg.Done()
-			sc := bufio.NewScanner(stderr)
-			sc.Buffer(make([]byte, 1024*1024), 1024*1024)
-			for sc.Scan() {
-				line := sc.Text()
-				wails.EventsEmit(a.ctx, "nim:out", line+"\n")
-				mu.Lock()
-				stderrLines = append(stderrLines, line)
-				mu.Unlock()
+			buf := make([]byte, 4096)
+			for {
+				n, err := stderr.Read(buf)
+				if n > 0 {
+					chunk := string(buf[:n])
+					wails.EventsEmit(a.ctx, "nim:out", chunk)
+					mu.Lock()
+					stderrOutput.WriteString(chunk)
+					mu.Unlock()
+				}
+				if err != nil {
+					return
+				}
 			}
 		}()
 
@@ -625,7 +630,7 @@ func (a *App) RunNim(cmdline string) {
 		}
 		a.procMu.Unlock()
 
-		combined := strings.Join(stderrLines, "\n")
+		combined := stderrOutput.String()
 		diags := parseDiags(combined, source)
 		for i, d := range diags {
 			if !filepath.IsAbs(d.File) {
@@ -785,7 +790,7 @@ echo "Hello from Nim!"
 	}
 	nimbleContent := fmt.Sprintf(`# Package
 version = "0.1.0"
-author = "Czax"
+author = "Your Name"
 description = "A new Nim project"
 license = "MIT"
 srcDir = "src"
