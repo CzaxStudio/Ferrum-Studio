@@ -345,7 +345,7 @@ Built with ♥ for the Nim community
 
 *"Ferrum" is Latin for iron — the element that gives steel its strength.*
 
-## Thanks <3
+## Thanks To
 
 [claude](https://claude.ai/) · [wails.io](https://wails.io)
 
