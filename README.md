@@ -51,9 +51,21 @@ Most editors treat Nim as an afterthought — a language server plugin bolted on
 
 <img width="1366" height="725" alt="Capture15" src="https://github.com/user-attachments/assets/5ff1f01e-8177-412d-a0f7-f2b78072c846" />
 
+---
 
+## What we added in v0.8
 
+- Instant Diagnostics: Compiler errors now appear in under 800ms with a new smart-clearing system that removes markers as soon as you start typing.
+- Faster Autocomplete: Autocomplete latency reduced to 60ms and threshold lowered to 1 character for near-instant suggestions.
+- Interactive IO Fix: Refactored backend stream handling to support unbuffered output and interactive stdin, fixing jumbled input/output issues.
+- Nim Treasure Map: Added a new interactive sidebar panel with curated, one-click code gems for common Nim patterns and idioms.
+- Expanded Error Fixes: Added 12 new human-readable error explanations and specific fix suggestions for common syntax and type errors.
+- Enhanced Layout: Upgraded the IDE with high-visibility, 12px editor scrollbars and improved contrast for navigating long scripts.
+- Refined Echo: User input in the terminal is now dimmed and uses inline printing to align correctly with interactive prompts.
 
+---
+
+## Features
 
 
 
