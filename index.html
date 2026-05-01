@@ -506,10 +506,10 @@
                 }
                 if (manualAltLink) {
                     manualAltLink.href = WINDOWS_DOWNLOAD_URL;
-                    manualAltLink.innerText = 'windows .exe (v0.7)';
+                    manualAltLink.innerText = 'windows .exe (v0.8)';
                 }
                 if (platformNoteDiv) {
-                    platformNoteDiv.innerHTML = `Windows native build (v0.7) ready. Nim compiler required. macOS and Linux builds planned — check GitHub releases.`;
+                    platformNoteDiv.innerHTML = `Windows native build (v0.8) ready. Nim compiler required. macOS and Linux builds planned — check GitHub releases.`;
                 }
             } 
             else if (detectedOS === 'macos') {
@@ -611,7 +611,7 @@
             }
             if (manualAltLink && detectedOS === 'windows') {
                 manualAltLink.href = WINDOWS_DOWNLOAD_URL;
-                manualAltLink.innerText = 'direct windows .exe (v0.7)';
+                manualAltLink.innerText = 'direct windows .exe (v0.8)';
             }
         }
 
