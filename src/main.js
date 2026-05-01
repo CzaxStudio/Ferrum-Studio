@@ -1,5 +1,6 @@
 import './style.css'
 import { TEMPLATES, buildTemplateDialog, explainError, buildEnhancedProblemItem } from './enhancements.js'
+import { buildGemsPanel } from './gems.js'
 
 // ══════════════════════════════════════════════════════════════════════════════
 //  FERRUM STUDIO  —  The Nim IDE
@@ -424,8 +425,8 @@ function acUpdate(ta) {
   const word = v.slice(start, pos)
   AC.word = word; AC.wordStart = start
 
-  // @ triggers at 1 char (builtins list), everything else at 2+ chars
-  const minLen = word.startsWith('@') ? 1 : 2
+  // Trigger at 1 char for everything
+  const minLen = 1
   if (word.length < minLen) { acClose(); return }
 
   const q = word.toLowerCase()
@@ -493,6 +494,45 @@ function acRender(ta) {
   })
 }
 
+// Show signature hint for known procs when user types (
+function showSigHint(ta) {
+  const pos = ta.selectionStart
+  const before = ta.value.slice(0, pos)
+  // Find the word before the (
+  const m = before.match(/(\w+)\s*\($/)
+  if (!m) { hideSigHint(); return }
+  const name = m[1]
+  // Look up in completion items
+  const item = COMPLETE_ITEMS.find(it =>
+    it.label === name || it.label.endsWith('.'+name) || it.label.endsWith('/'+name)
+  )
+  if (!item || !item.detail) { hideSigHint(); return }
+  let hint = document.getElementById('sig-hint')
+  if (!hint) {
+    hint = document.createElement('div')
+    hint.id = 'sig-hint'
+    hint.className = 'sig-hint'
+    document.body.appendChild(hint)
+  }
+  hint.textContent = item.label + '(' + (item.detail.includes('(') ? item.detail.split('(').slice(1).join('(').replace(/\).*/, ')') : item.detail) + ')'
+  hint.style.display = 'block'
+  // Position above cursor
+  const pane = document.getElementById('code-pane')
+  const pr = pane ? pane.getBoundingClientRect() : {left:0, top:0}
+  const lines = before.split('\n')
+  const lineNo = lines.length
+  const col = lines[lineNo-1].length
+  const x = pr.left + 54 + col * 7.4
+  const y = pr.top + 12 + (lineNo-1) * 22
+  hint.style.left = Math.min(x, window.innerWidth - 300) + 'px'
+  hint.style.top  = Math.max(0, y - 28) + 'px'
+}
+
+function hideSigHint() {
+  const h = document.getElementById('sig-hint')
+  if (h) h.style.display = 'none'
+}
+
 function acAccept(ta) {
   if (!AC.open || !AC.items[AC.idx]) return
   const item = AC.items[AC.idx]
@@ -540,6 +580,7 @@ const S = {
   _hlTimer: 0,
   _acTimer: 0,
   _lastLineCount: 0,
+  _bmTimer: 0,
   _mmTimer: 0,
 }
 
@@ -583,8 +624,9 @@ let _fontSize = parseInt(localStorage.getItem('ferrum-fontsize') || '13', 10)
 
 const PREFS = {
   fontSize:  parseInt(localStorage.getItem('fs:fontSize')  || '13'),
-  tabSize:   parseInt(localStorage.getItem('fs:tabSize')   || '4'),
+  tabSize:   parseInt(localStorage.getItem('fs:tabSize')   || '2'),
   minimap:   localStorage.getItem('fs:minimap') !== 'false',
+  fmtOnSave: localStorage.getItem('fs:fmtOnSave') === 'true',
   theme:     localStorage.getItem('fs:theme') || 'dark',
   lineWrap:  localStorage.getItem('fs:lineWrap') === 'true',
 }
@@ -706,6 +748,14 @@ function buildSettingsPanel() {
       </div>
     </div>
     <div class="setting-group">
+      <div class="setting-label">Format on Save</div>
+      <label class="toggle-label">
+        <input type="checkbox" id="fmtonsave-toggle" ${PREFS.fmtOnSave?'checked':''}>
+        <span class="toggle-track"></span>
+        <span class="toggle-text">Run nimpretty on every save</span>
+      </label>
+    </div>
+    <div class="setting-group">
       <div class="setting-label">Minimap</div>
       <label class="toggle-label">
         <input type="checkbox" id="minimap-toggle" ${PREFS.minimap?'checked':''}>
@@ -726,8 +776,6 @@ function buildSettingsPanel() {
       <div class="setting-hint">Ferrum Studio — The Nim IDE</div>
       <div class="setting-hint">Built with Wails + Go + Vanilla JS</div>
       <div class="setting-hint">Open source. Made for Nim developers.</div>
-      <div class="setting-hint">Made by Czax. Follow me on GitHub --> https://github.com/CzaxStudio</div>
-      <div class="setting-hint">Special thanks to Claude AI and VS Code.</div>
     </div>`
 
   wrap.appendChild(body)
@@ -766,6 +814,10 @@ function buildSettingsPanel() {
     document.getElementById('minimap-toggle')?.addEventListener('change', e => {
       PREFS.minimap = e.target.checked
       savePrefs(); applyPrefs()
+    })
+    document.getElementById('fmtonsave-toggle')?.addEventListener('change', e => {
+      PREFS.fmtOnSave = e.target.checked
+      localStorage.setItem('fs:fmtOnSave', PREFS.fmtOnSave)
     })
     // Zig path display
     const zpd = document.getElementById('nim-path-display')
@@ -1190,6 +1242,97 @@ const STD_DOCS = [
              'compiles(expr): bool — CT check'] },
 ]
 
+// Parse Nim symbols from current file for the outline panel
+function parseNimOutline(content) {
+  const symbols = []
+  const lines = content.split('\n')
+  const procRe    = /^(\s*)(pub\s+)?(proc|func|method|iterator|template|macro|converter)\s+(\w+)/
+  const typeRe    = /^(\s*)type\s*$/
+  const typeDefRe = /^(\s{2,})(\w+)\s*[*=]/
+  const constRe   = /^(\s*)(const|var|let)\s*$/
+  const constDefRe= /^(\s{2,})(\w+)\s*[*:=]/
+  let inTypeBlock = false, inConstBlock = false
+
+  lines.forEach((line, i) => {
+    const pm = line.match(procRe)
+    if (pm) {
+      symbols.push({ kind: pm[3], name: pm[4], line: i+1,
+        pub: !!pm[2], indent: pm[1].length })
+      inTypeBlock = false; inConstBlock = false
+      return
+    }
+    if (/^(\s*)type\s*$/.test(line)) { inTypeBlock = true; inConstBlock = false; return }
+    if (/^(\s*)(const|var|let)\s*$/.test(line)) { inConstBlock = true; inTypeBlock = false; return }
+    if (inTypeBlock && /^  \w/.test(line)) {
+      const dm = line.match(/^  (\w+)/)
+      if (dm) symbols.push({ kind:'type', name: dm[1], line: i+1, pub:false, indent:2 })
+    }
+    if (inConstBlock && /^  \w/.test(line)) {
+      const dm = line.match(/^  (\w+)/)
+      if (dm) symbols.push({ kind:'const', name: dm[1], line: i+1, pub:false, indent:2 })
+    }
+    if (line.trim() && !line.startsWith(' ')) { inTypeBlock=false; inConstBlock=false }
+  })
+  return symbols
+}
+
+function buildOutlinePanel() {
+  const wrap = mk('div','sb-panel-inner')
+  const hdr = mk('div','sb-hdr')
+  hdr.innerHTML = '<span class="sb-title">OUTLINE</span>'
+  const refreshBtn = mkt('button','icon-btn','R')
+  refreshBtn.title = 'Refresh'
+  refreshBtn.addEventListener('click', refreshOutline)
+  hdr.appendChild(refreshBtn)
+  wrap.appendChild(hdr)
+  const list = mk('div','outline-list'); list.id='outline-list'
+  wrap.appendChild(list)
+  setTimeout(refreshOutline, 100)
+  return wrap
+}
+
+function refreshOutline() {
+  const list = document.getElementById('outline-list')
+  if (!list) return
+  const tab = activeTab()
+  if (!tab) { list.innerHTML='<div class="ref-empty">No file open</div>'; return }
+  const symbols = parseNimOutline(tab.content)
+  if (!symbols.length) { list.innerHTML='<div class="ref-empty">No symbols found</div>'; return }
+  const kindIcon = {
+    proc:'p', func:'f', method:'m', iterator:'i',
+    template:'t', macro:'M', converter:'c', type:'T', const:'C'
+  }
+  const kindColor = {
+    proc:'#c084fc', func:'#c084fc', method:'#c084fc',
+    iterator:'#60a5fa', template:'#4ade80', macro:'#f97316',
+    converter:'#fbbf24', type:'#67e8f9', const:'#9090b0'
+  }
+  list.innerHTML = symbols.map(s => {
+    const icon = kindIcon[s.kind] || 'x'
+    const color = kindColor[s.kind] || '#9090b0'
+    const pub = s.pub ? ' *' : ''
+    return '<div class="outline-row" data-line="'+s.line+'">' +
+      '<span class="outline-icon" style="color:'+color+'">'+icon+'</span>' +
+      '<span class="outline-name">'+escH(s.name)+pub+'</span>' +
+      '<span class="outline-kind">'+escH(s.kind)+'</span>' +
+      '<span class="outline-line">'+s.line+'</span>' +
+    '</div>'
+  }).join('')
+  list.querySelectorAll('.outline-row').forEach(row => {
+    row.addEventListener('click', () => {
+      const line = parseInt(row.dataset.line)
+      const ta = document.getElementById('editor-ta')
+      if (!ta) return
+      const v = ta.value, ls = v.split('\n')
+      let pos = 0
+      for (let i = 0; i < line-1; i++) pos += ls[i].length + 1
+      ta.focus(); ta.setSelectionRange(pos, pos)
+      ta.scrollTop = Math.max(0, (line-5)*22)
+      updateCursorPos(ta)
+    })
+  })
+}
+
 function buildDocsPanel() {
   const wrap = mk('div', 'sb-panel-inner')
   const hdr = mk('div', 'sb-hdr')
@@ -1455,6 +1598,37 @@ function parseLeaks(output) {
 
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
+async function showNimbleDeps() {
+  // Read the .nimble file and show requires section
+  if (!S.tree) { tLine('Open a project folder first.', '#f87171'); return }
+  // Find .nimble file
+  let nimblePath = null
+  function findNimble(node) {
+    if (!node) return
+    if (!node.isDir && node.name.endsWith('.nimble')) { nimblePath = node.path; return }
+    node.children?.forEach(findNimble)
+  }
+  findNimble(S.tree)
+  if (!nimblePath) { tLine('No .nimble file found in project.', '#f87171'); return }
+  const content = await go('ReadFile', nimblePath)
+  if (!content) return
+  tLine('\n--- ' + nimblePath.split(/[\\/]/).pop() + ' dependencies ---', '#60a5fa')
+  const lines = content.split('\n')
+  let found = false
+  lines.forEach(line => {
+    const t = line.trim()
+    if (t.startsWith('requires')) {
+      tLine('  ' + t, '#4ade80')
+      found = true
+    }
+    if (t.startsWith('version') || t.startsWith('author') || t.startsWith('description')) {
+      tLine('  ' + t, '#9090b0')
+    }
+  })
+  if (!found) tLine('  No requires lines found.', '#9090b0')
+  tLine('\nRun: nimble install  to install all dependencies', '#60a5fa')
+}
+
 async function boot() {
   S.tabs.push({ id:'demo', path:null, name:'main.nim', content:DEMO, dirty:false, lang:'nim' })
   S.activeTab = 'demo'
@@ -1472,6 +1646,7 @@ async function boot() {
   // Restore font size from last session
   if (_fontSize !== 13) applyFontSize(_fontSize)
   go('GetGitStatus').then(gs => { if(gs) { S.gitStatus=gs; updateGitUI() } })
+  refreshOutline()
 }
 
 // ── Build entire app ──────────────────────────────────────────────────────────
@@ -1591,12 +1766,29 @@ function buildSidebar() {
         <line x1="14" y1="12" x2="14" y2="14" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
       </svg>
     </button>
+    <button class="act-btn" data-pnl="gems" title="Nim Treasure Map (Gems &amp; Cookbook)">
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+        <path d="M2 16L9 9L16 16" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M16 2L9 9L2 2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="9" cy="9" r="2" fill="currentColor"/>
+        <path d="M9 2V5M9 13V16M2 9H5M13 9H16" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+      </svg>
+    </button>
     <button class="act-btn" data-pnl="docs" title="Zig Docs Browser">
       <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
         <rect x="2" y="2" width="14" height="14" rx="2" stroke="currentColor" stroke-width="1.3"/>
         <line x1="5" y1="6" x2="13" y2="6" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
         <line x1="5" y1="9" x2="13" y2="9" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
         <line x1="5" y1="12" x2="9" y2="12" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+      </svg>
+    </button>
+    <button class="act-btn" data-pnl="outline" title="Code Outline">
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+        <line x1="3" y1="4"  x2="15" y2="4"  stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+        <line x1="5" y1="8"  x2="15" y2="8"  stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/>
+        <line x1="5" y1="12" x2="15" y2="12" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/>
+        <circle cx="3" cy="8"  r="1" fill="currentColor"/>
+        <circle cx="3" cy="12" r="1" fill="currentColor"/>
       </svg>
     </button>
     <button class="act-btn" data-pnl="settings" title="Settings">
@@ -1638,7 +1830,11 @@ function buildSidebar() {
   docsPanel.appendChild(buildDocsPanel())
   const settingsPanel = mk('div','sb-panel hidden'); settingsPanel.id='pnl-settings'
   settingsPanel.appendChild(buildSettingsPanel())
-  content.append(explorer, buildPanel, snipPanel, docsPanel, settingsPanel)
+  const outlinePanel = mk('div','sb-panel hidden'); outlinePanel.id='pnl-outline'
+  outlinePanel.appendChild(buildOutlinePanel())
+  const gemsPanel = mk('div','sb-panel hidden'); gemsPanel.id='pnl-gems'
+  gemsPanel.appendChild(buildGemsPanel(insertAtCursor))
+  content.append(explorer, buildPanel, snipPanel, gemsPanel, docsPanel, outlinePanel, settingsPanel)
   sb.append(act, content)
   return sb
 }
@@ -2509,6 +2705,23 @@ function onEditorInput(e) {
   updateCursorPos(ta)
   updateTabDot(tab.id)
 
+  // Eagerly clear diagnostics for the current line to make the UI feel responsive
+  // The full check will run shortly after typing stops.
+  if (tab.path && S.diagsByFile[tab.path]) {
+    const lineNo = ta.value.substring(0, ta.selectionStart).split('\n').length
+    const originalCount = S.diagsByFile[tab.path].length
+    S.diagsByFile[tab.path] = S.diagsByFile[tab.path].filter(d => d.line !== lineNo)
+    if (S.diagsByFile[tab.path].length !== originalCount) {
+      _lineCache[lineNo - 1] = null
+      if (S.diagsByFile[tab.path].length === 0) delete S.diagsByFile[tab.path]
+      redrawHL()
+      redrawSquiggles()
+      updateProblems()
+      updateTabBadges()
+      updateTreeBadges()
+    }
+  }
+
   // Debounced highlight: 50ms for small files, 80ms for large ones
   clearTimeout(S._hlTimer)
   const hlDelay = tab.content.length > 30000 ? 80 : 50
@@ -2522,12 +2735,12 @@ function onEditorInput(e) {
   }, hlDelay)
 
   clearTimeout(S._acTimer)
-  S._acTimer = setTimeout(function() { acUpdate(ta) }, 180)
+  S._acTimer = setTimeout(function() { acUpdate(ta) }, 60)
 
   if (tab.path) {
     clearTimeout(S.checkTimer)
-    // Larger files get a longer debounce to avoid hammering zig ast-check
-    const checkDelay = tab.content.length > 50000 ? 4000 : 2500
+    // Responsive debounce: fast for small files
+    const checkDelay = tab.content.length > 50000 ? 2000 : 800
     S.checkTimer = setTimeout(function() { autoCheck(tab) }, checkDelay)
   }
   // Minimap full redraw at low priority — 400ms debounce, doesn't block typing
@@ -2548,8 +2761,9 @@ function updateCursorPos(ta) {
   if (el) el.textContent = 'Ln ' + lineNo + ', Col ' + col
   var cl = document.getElementById('cur-line-hl')
   if (cl) cl.style.top = (12 + (lineNo - 1) * 22) + 'px'
-  // Bracket match highlight
-  highlightMatchingBracket(ta)
+  // Bracket match highlight — debounced so it doesn't block typing
+  clearTimeout(S._bmTimer)
+  S._bmTimer = setTimeout(function(){ highlightMatchingBracket(ta) }, 80)
 }
 
 function highlightMatchingBracket(ta) {
@@ -2642,18 +2856,20 @@ function onEditorKey(e) {
     const {selectionStart:s,selectionEnd:en,value:v} = ta
     if (e.shiftKey) {
       const ls=v.lastIndexOf('\n',s-1)+1
-      if (v.slice(ls,ls+4)==='    ') {
-        ta.value=v.slice(0,ls)+v.slice(ls+4); ta.selectionStart=ta.selectionEnd=Math.max(ls,s-4)
+      const tsp2=PREFS.tabSize||2
+      if (v.slice(ls,ls+tsp2)===' '.repeat(tsp2)) {
+        ta.value=v.slice(0,ls)+v.slice(ls+tsp2); ta.selectionStart=ta.selectionEnd=Math.max(ls,s-tsp2)
         const _utab=activeTab(); if(_utab){_utab.content=ta.value;_utab.dirty=true}
-        clearTimeout(S._hlTimer); S._hlTimer=setTimeout(function(){redrawHL();var _lc=ta.value.split('\n').length;if(_lc!==S._lastLineCount){S._lastLineCount=_lc;redrawGutter()}resizeTextarea(activeTab())},50)
+        clearTimeout(S._hlTimer); S._hlTimer=setTimeout(function(){redrawHL();var _lc=ta.value.split('\n').length;if(_lc!==S._lastLineCount){S._lastLineCount=_lc;redrawGutter()}},50)
         updateCursorPos(ta)
       }
     } else if (s===en && trySnippet(ta)) {
       // snippet expanded
     } else {
-      ta.value=v.slice(0,s)+'    '+v.slice(en); ta.selectionStart=ta.selectionEnd=s+4
+      const tsp=' '.repeat(PREFS.tabSize||2)
+      ta.value=v.slice(0,s)+tsp+v.slice(en); ta.selectionStart=ta.selectionEnd=s+(PREFS.tabSize||2)
       const _tab=activeTab(); if(_tab){_tab.content=ta.value;_tab.dirty=true}
-      clearTimeout(S._hlTimer); S._hlTimer=setTimeout(function(){redrawHL();var lc2=ta.value.split('\n').length;if(lc2!==S._lastLineCount){S._lastLineCount=lc2;redrawGutter()}resizeTextarea(activeTab())},50)
+      clearTimeout(S._hlTimer); S._hlTimer=setTimeout(function(){redrawHL();var lc2=ta.value.split('\n').length;if(lc2!==S._lastLineCount){S._lastLineCount=lc2;redrawGutter()}},50)
       updateCursorPos(ta)
     }
     return
@@ -2663,18 +2879,34 @@ function onEditorKey(e) {
     e.preventDefault()
     acClose()
     const {selectionStart:s,value:v} = ta
-    const ls=v.lastIndexOf('\n',s-1)+1
-    const line=v.slice(ls,s)
-    const indent=line.match(/^(\s*)/)[1]
-    const extra=/[{(\[]$/.test(line.trimEnd())?'    ':''
-    const ins='\n'+indent+extra
-    ta.value=v.slice(0,s)+ins+v.slice(ta.selectionEnd)
-    ta.selectionStart=ta.selectionEnd=s+ins.length
-    // Direct update — avoids doubling the input event
-    const _etab=activeTab(); if(_etab){_etab.content=ta.value;_etab.dirty=true}
-    clearTimeout(S._hlTimer); S._hlTimer=setTimeout(function(){redrawHL();var _elc=ta.value.split('\n').length;if(_elc!==S._lastLineCount){S._lastLineCount=_elc;redrawGutter()}resizeTextarea(activeTab())},50)
+    const ls = v.lastIndexOf('\n', s-1) + 1
+    const line = v.slice(ls, s)
+    const trimmed = line.trimEnd()
+    const indent = line.match(/^(\s*)/)[1]
+    const ts = ' '.repeat(PREFS.tabSize || 2)
+    // Nim: indent after lines ending with = : do begin of then else elif
+    const needsIndent = /[=:]$/.test(trimmed) ||
+      /\b(do|begin|of|then|else|elif|finally|except|try)$/.test(trimmed)
+    const extra = needsIndent ? ts : ''
+    const ins = '\n' + indent + extra
+    ta.value = v.slice(0, s) + ins + v.slice(ta.selectionEnd)
+    ta.selectionStart = ta.selectionEnd = s + ins.length
+    const _etab = activeTab()
+    if (_etab) { _etab.content = ta.value; _etab.dirty = true }
+    clearTimeout(S._hlTimer)
+    S._hlTimer = setTimeout(function() {
+      redrawHL()
+      var _elc = ta.value.split('\n').length
+      if (_elc !== S._lastLineCount) { S._lastLineCount = _elc; redrawGutter() }
+    }, 50)
     updateCursorPos(ta); return
   }
+
+  // Proc signature hint on (
+  if (e.key === '(') {
+    setTimeout(function(){ showSigHint(ta) }, 0)
+  }
+  if (e.key === ')' || e.key === 'Escape') { hideSigHint() }
 
   // Auto-close brackets & quotes
   const pairs={'(':')','[':']','{':'}'}
@@ -2687,7 +2919,7 @@ function onEditorKey(e) {
       // Update content directly without retriggering full onEditorInput
       const tab=activeTab(); if(tab){tab.content=ta.value;tab.dirty=true}
       clearTimeout(S._hlTimer)
-      S._hlTimer=setTimeout(function(){redrawHL();var lc=ta.value.split('\n').length;if(lc!==S._lastLineCount){S._lastLineCount=lc;redrawGutter()}resizeTextarea(activeTab())},50)
+      S._hlTimer=setTimeout(function(){redrawHL();var lc=ta.value.split('\n').length;if(lc!==S._lastLineCount){S._lastLineCount=lc;redrawGutter()}},50)
       updateCursorPos(ta)
       return
     }
@@ -3053,10 +3285,25 @@ function runBuildStep(name) {
   _ts.t = Date.now()
 }
 
+function parseNimTestOutput(output) {
+  const results = []
+  output.split('\n').forEach(line => {
+    const t = line.trim()
+    let m
+    if ((m = t.match(/\[OK\]\s+(.+)/)))          results.push({name:m[1].trim(),status:'pass',output:''})
+    else if ((m = t.match(/\[FAILED\]\s+(.+)/))) results.push({name:m[1].trim(),status:'fail',output:''})
+    else if ((m = t.match(/\[SKIPPED\]\s+(.+)/)))results.push({name:m[1].trim(),status:'skip',output:''})
+  })
+  return results
+}
+
 function onNimDone(code) {
   setRunning(false)
   // Parse GPA leak output from accumulated terminal output
   const termEl = document.getElementById('term-out')
+  const termText2 = termEl ? (termEl.textContent||'') : ''
+  const tr2 = parseNimTestOutput(termText2)
+  if (tr2.length) { applyTestResults(tr2); switchPanel('tests') }
   if (termEl) {
     const termText = termEl.textContent || ''
     const leaks = parseLeaks(termText)
@@ -3255,7 +3502,9 @@ async function onTermKey(e) {
       e.preventDefault()
       const text = inp.value  // send as-is, including empty lines
       // Echo input to terminal so user can see what they typed
-      tLine(text, '#e2e8f0')
+      // We use tPrint instead of tLine to avoid an extra <div> which forces a newline,
+      // and we use \x1b[2m for a dim style.
+      tPrint('\x1b[2m' + text + '\n\x1b[0m')
       inp.value = ''
       await go('SendInput', text)
     }
@@ -3304,6 +3553,7 @@ async function handleTermCmd(raw) {
       '  \x1b[2mfmt\x1b[0m                nimpretty <active file>\n'+
       '  \x1b[2mcheck\x1b[0m              nim check (shows in Problems)\n'+
       '  \x1b[2mnimble <cmd>\x1b[0m       any nimble command\n'+
+      '  \x1b[2mdeps\x1b[0m               show .nimble dependencies\n'+
       '  \x1b[2mversion\x1b[0m            nim --version\n'+
       '  \x1b[2mclear\x1b[0m              clear terminal\n\n')
     return
@@ -3324,6 +3574,7 @@ async function handleTermCmd(raw) {
   if(cmd==='version'){runNim('--version');return}
   if(cmd==='nim'){runNim(p.slice(1).join(' '));return}
   if(cmd==='nimble'){runNim('nimble '+p.slice(1).join(' '));return}
+  if(cmd==='deps'){showNimbleDeps();return}
   tLine(`command not found: ${cmd}  (type 'help')`, '#f87171')
 }
 
@@ -3543,7 +3794,16 @@ async function cmdSaveAndCheck() {
   if(!tab.path){await cmdSaveAs();return}
   const err=await go('WriteFile',tab.path,tab.content); if(err){tLine('Save error: '+err,'#f87171');return}
   tab.dirty=false; updateTabDot(tab.id)
-  // Auto-check on save
+  // Format on save
+  if (PREFS.fmtOnSave && tab.lang==='nim') {
+    const fmt = await go('NimFmt', tab.path)
+    if (fmt && !fmt.startsWith('error:')) {
+      tab.content = fmt
+      const ta = document.getElementById('editor-ta')
+      if (ta) { ta.value = fmt; _lineCache.length=0; redrawHL(); redrawGutter() }
+      await go('WriteFile', tab.path, fmt)
+    }
+  }
   const diags=await go('NimCheck',tab.path)
   if(diags) applyDiags(diags)
 }
@@ -3913,6 +4173,7 @@ function reRenderEditor() {
   setTimeout(() => {
     $('#editor-ta')?.focus()
     updateBreadcrumb()
+    refreshOutline()
   }, 20)
 }
 
