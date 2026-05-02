@@ -213,8 +213,8 @@ wails build -platform darwin/universal
 
 # Linux
 wails build -platform linux/amd64
+npm install -D vite-node
 ```
-
 Output binary is in `build/bin/`.
 
 ---
